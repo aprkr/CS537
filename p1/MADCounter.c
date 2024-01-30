@@ -11,7 +11,7 @@ typedef struct word{
   struct word * prevWord;
 } WORD;
 
-typedef struct lines{
+typedef struct line{
   char * contents;
   int numChars;
   int frequency;
@@ -77,8 +77,7 @@ void readChar(FILE *fp){
 	// first must get the amount of chars in the file in order to create the array
 	rewind(fp);
 	int c, charCount, uniqueChar = 0;
-	singleChar *head = NULL;
-	singleChar *tail = NULL;
+	singleChar *head, *tail = NULL;
     // loop through all the chars in the file
 	while((c = fgetc(fp)) != EOF){
 		charCount++;
@@ -100,7 +99,7 @@ void readChar(FILE *fp){
 		}
 	}
 	//
-	printf("Total Number of Chars = %i\nTotal Unique Chars = %i\n\n", charCount, uniqueChar);
+	printf("Total Number of Chars: %i\nTotal Unique Chars: %i\n\n", charCount, uniqueChar);
 	
 	// after we create the linked list print out the contents
 	singleChar *curr = head;
@@ -108,16 +107,87 @@ void readChar(FILE *fp){
 		printf("Ascii Value: %d, Char: %c, Count: %i, Inital Position: %i\n", curr->contents, curr->contents, curr->frequency, (curr->pos) - 1);
 		curr = curr -> nextChar;
 	}
+}
 	
+void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
+	
+	WORD* ptr = (WORD*) malloc(sizeof(WORD));
+	// initialize the new char node in the linked list
+	ptr->contents = word;
+	ptr->frequency = 1;
+	ptr->orderAppeared = pos;
+	ptr->nextWord = NULL;
+	ptr->prevWord = NULL;
+	// if linked list is empty insert at the start of the list
+	if((*head) == NULL){
+		(*head) = ptr;
+		(*tail) = (*head);
+		(*len)++;
+	}
+	else{
+		WORD *curr = (*head);
+		while(strcmp((curr)->contents, word) < 0){
+			// insert at the end of the list
+			if(curr->nextWord == NULL){
+				curr->nextWord = ptr;
+				ptr->prevWord = curr;
+				(*tail) = ptr;
+				(*len)++;
+				return;
+			}
+			curr = curr->nextWord;
+		}
+		// insert at some position in the middle of the linked list
+		if(curr->prevWord == NULL){
+			curr->prevWord = ptr;
+			ptr->nextWord = curr;
+			(*head) = ptr;
+			(*len)++;
+		}
+		else{
+			ptr->nextWord = curr;
+			ptr->prevWord = curr->prevWord;
+			curr->prevWord->nextWord = ptr;
+			curr->prevWord = ptr;
+			(*len)++;
+		}
+	}
+}
 
-	// // grab all of the words out of the file and put it in the structs
-	// fseek(fp, 0, SEEK_SET);
-	// char word[50];
-	// int wordCount;
-	// while(fscanf(fp, "%50s", word) != EOF){
-	// 	wordCount++;
-	// 	printf("%s\n", word);
-	// }
+void readWord(FILE* fp){
+	// grab all of the words out of the file and put it in the structs
+	rewind(fp);
+	char word[50];
+	int wordCount, uniqueWord;
+	WORD *head, *tail = NULL;
+	while(fscanf(fp, "%50s", word) != EOF){
+		wordCount++;
+		int match = 0;
+		WORD *ptr = head;
+		while(ptr != NULL){
+			if(strcmp(ptr->contents, word) == 0){
+				ptr->frequency++;
+				match = 1;
+				break;
+			}
+			ptr = ptr->nextWord;
+		}
+		if(match){
+			continue;
+		}
+		else{
+			addWord(word, &head, &tail, &uniqueWord, wordCount);
+		}
+	}
+	printf("Total Number of Words: %i\nTotal Unique Words:%i\n\n", wordCount, uniqueWord);
+
+	WORD *curr = head;
+	while(curr != NULL){
+		printf("Word: %s, Freq: %i, Initial Position: %i", curr->contents, curr->frequency, curr->orderAppeared);
+	}
+}
+
+	
 	// // grab all of the individual lines
 	// fseek(fp, 0, SEEK_SET);
 	// char line[filesize];
@@ -130,8 +200,6 @@ void readChar(FILE *fp){
 	// 	printf("%s\n", line);
 	// 	lineCount++;
 	// }
-	fclose(fp);
-}
 
 void readBatch(FILE *fp, long filesize){
 	fseek(fp, 0, SEEK_SET);
@@ -145,11 +213,11 @@ int main(int argc, char* argv[]){
 		return(1);
     }
     // ensure that all flags start with are correct 
-    char flags[7][3] = {"-f", "-o", "-c", "-w", "-l", "-Lw", "-Ll"};
-    // an int to keep track of if the -o flag was used
-    int o_flag, c_flag, o_pos = 0;
+    char *flags[7] = {"-f", "-o", "-c", "-w", "-l", "-Lw", "-Ll"};
+    // an int to keep track of which flags were used
+	int o_flag, c_flag, w_flag, o_pos = 0;
     for(int i = 0; i < argc; i++){
-    	if(strchr(argv[i],'-') != NULL){
+    	if(strchr(argv[i],'-') > 0x0){
     		for(int j = 0; j < 7; j++){
 				if(strcmp(argv[i],flags[j]) == 0){
 					if(strcmp(argv[i], "-o") == 0){
@@ -159,10 +227,13 @@ int main(int argc, char* argv[]){
 					else if(strcmp(argv[i], "-c") == 0){
 						c_flag = 1;
 					}
+					else if(strcmp(argv[i], "-w") == 0){
+						w_flag = 1;
+					}
 					break;
 				}
 				// if an incorrect flag has been used errror out
-				else if(i == 7){
+				else if(i == 6){
 					printf("ERROR: Invalid Flag Types\n");
 					return(1);
 				}
@@ -232,10 +303,11 @@ int main(int argc, char* argv[]){
    	if(B_flag){
    		readBatch(fp, fileSize);
    	}
-   	else{
-   		if(c_flag == 1){
-			readChar(fp);
-		}
-   	}
+   	else if(c_flag == 1){
+		readChar(fp);
+	}
+	else if(w_flag == 1){
+		readWord(fp);
+	}
    	return(0);
 }
