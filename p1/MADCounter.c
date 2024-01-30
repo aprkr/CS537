@@ -23,60 +23,113 @@ typedef struct lines{
 typedef struct singleChar{
 	char contents;
 	int frequency;
-} SINGLECHAR;
+	int pos;
+	struct singleChar * nextChar;
+	struct singleChar * prevChar;
+} singleChar;
 
-void readFile(FILE *fp, long filesize){
+void addChar(char c, singleChar **head, singleChar **tail, int* len, int pos){
+	
+	singleChar* ptr = (singleChar*) malloc(sizeof(singleChar));
+	// initialize the new char node in the linked list
+	ptr->contents = c;
+	ptr->frequency = 1;
+	ptr->pos = pos;
+	ptr->nextChar = NULL;
+	ptr->prevChar = NULL;
+	// if linked list is empty insert at the start of the list
+	if((*head) == NULL){
+		(*head) = ptr;
+		(*tail) = (*head);
+		(*len)++;
+	}
+	else{
+		singleChar *curr = (*head);
+		while((curr)->contents < c){
+			// insert at the end of the list
+			if(curr->nextChar == NULL){
+				curr->nextChar = ptr;
+				ptr->prevChar = curr;
+				(*tail) = ptr;
+				(*len)++;
+				return;
+			}
+			curr = curr->nextChar;
+		}
+		// insert at some position in the middle of the linked list
+		if(curr->prevChar == NULL){
+			curr->prevChar = ptr;
+			ptr->nextChar = curr;
+			(*head) = ptr;
+			(*len)++;
+		}
+		else{
+			ptr->nextChar = curr;
+			ptr->prevChar = curr->prevChar;
+			curr->prevChar->nextChar = ptr;
+			curr->prevChar = ptr;
+			(*len)++;
+		}
+	}
+}
+
+void readChar(FILE *fp){
 	// first must get the amount of chars in the file in order to create the array
 	rewind(fp);
-	int c, charCount = 0;
-    while((c = fgetc(fp)) != EOF){
+	int c, charCount, uniqueChar = 0;
+	singleChar *head = NULL;
+	singleChar *tail = NULL;
+    // loop through all the chars in the file
+	while((c = fgetc(fp)) != EOF){
 		charCount++;
-	}
-	// after we find the size then we can create the array and sort it 
-	rewind(fp);
-	SINGLECHAR *chars = malloc(charCount * sizeof(SINGLECHAR));
-	for(int i = 0; i < charCount; i++){
-		c = fgetc(fp);
-		// check to see how many other instances of that char appear in the array
-		for(int j = 0; j < i; j++){
-			if(strcmp(chars[i].contents, chars[j].contents) == 0){
-				chars[i].frequency++;
+		int match = 0;
+		singleChar *ptr = head;
+		while(ptr != NULL){
+			if(ptr->contents == (char) c){
+				ptr->frequency++;
+				match = 1;
+				break;
 			}
+			ptr = ptr->nextChar;
 		}
-		for(in )
-			if(strcmp(chars[i].contents, chars[j].contents) == 1 && strcmp(chars[i + 1].contents, chars[j].contents) == 1){
-				
-				strcmp(chars[i].contents, chars[j].contents) == 1
-			}
-			else{
+		if(match){
+			continue;
+		}
+		else{
+			addChar((char) c, &head, &tail, &uniqueChar, charCount);
+		}
+	}
+	//
+	printf("Total Number of Chars = %i\nTotal Unique Chars = %i\n\n", charCount, uniqueChar);
+	
+	// after we create the linked list print out the contents
+	singleChar *curr = head;
+	while(curr != NULL){
+		printf("Ascii Value: %d, Char: %c, Count: %i, Inital Position: %i\n", curr->contents, curr->contents, curr->frequency, (curr->pos) - 1);
+		curr = curr -> nextChar;
+	}
+	
 
-			}
-		
-	}
-	printf("twas this many chars: %i\n", charCount);
-	for(int i = 0; i < charCount; i++){
-		printf("%c\n", chars[i]);
-	}
-	// grab all of the words out of the file and put it in the structs
-	fseek(fp, 0, SEEK_SET);
-	char word[50];
-	int wordCount;
-	while(fscanf(fp, "%50s", word) != EOF){
-		wordCount++;
-		printf("%s\n", word);
-	}
-	// grab all of the individual lines
-	fseek(fp, 0, SEEK_SET);
-	char line[filesize];
-	int lineCount;
-	while(fgets(line, filesize, fp) != NULL){
-		if(feof(fp)){
-			printf("%i\n", lineCount);
-			break;
-		}
-		printf("%s\n", line);
-		lineCount++;
-	}
+	// // grab all of the words out of the file and put it in the structs
+	// fseek(fp, 0, SEEK_SET);
+	// char word[50];
+	// int wordCount;
+	// while(fscanf(fp, "%50s", word) != EOF){
+	// 	wordCount++;
+	// 	printf("%s\n", word);
+	// }
+	// // grab all of the individual lines
+	// fseek(fp, 0, SEEK_SET);
+	// char line[filesize];
+	// int lineCount;
+	// while(fgets(line, filesize, fp) != NULL){
+	// 	if(feof(fp)){
+	// 		printf("%i\n", lineCount);
+	// 		break;
+	// 	}
+	// 	printf("%s\n", line);
+	// 	lineCount++;
+	// }
 	fclose(fp);
 }
 
@@ -94,7 +147,7 @@ int main(int argc, char* argv[]){
     // ensure that all flags start with are correct 
     char flags[7][3] = {"-f", "-o", "-c", "-w", "-l", "-Lw", "-Ll"};
     // an int to keep track of if the -o flag was used
-    int o_flag, o_pos = 0;
+    int o_flag, c_flag, o_pos = 0;
     for(int i = 0; i < argc; i++){
     	if(strchr(argv[i],'-') != NULL){
     		for(int j = 0; j < 7; j++){
@@ -102,6 +155,9 @@ int main(int argc, char* argv[]){
 					if(strcmp(argv[i], "-o") == 0){
 						o_flag = 1;
 						o_pos = i;
+					}
+					else if(strcmp(argv[i], "-c") == 0){
+						c_flag = 1;
 					}
 					break;
 				}
@@ -157,7 +213,7 @@ int main(int argc, char* argv[]){
 		return(1);
 	}
 	// if -o flag is specified make sure that there is an output file specificed
-	if(o_flag){
+	if(o_flag == 1){
 		if(strchr(argv[o_pos + 1], '-') != NULL){
 			fclose(fp);
 			printf("ERROR: No Output File Provided\n");
@@ -177,7 +233,9 @@ int main(int argc, char* argv[]){
    		readBatch(fp, fileSize);
    	}
    	else{
-   		readFile(fp, fileSize);
+   		if(c_flag == 1){
+			readChar(fp);
+		}
    	}
    	return(0);
 }
