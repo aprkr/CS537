@@ -16,8 +16,8 @@ typedef struct line{
   int numChars;
   int frequency;
   int orderAppeared;
-  struct word * nextLine;
-  struct word * prevLine;
+  struct line * nextLine;
+  struct line * prevLine;
 } LINE;
 
 typedef struct singleChar{
@@ -29,7 +29,7 @@ typedef struct singleChar{
 } singleChar;
 
 void addChar(char c, singleChar **head, singleChar **tail, int* len, int pos){
-	
+
 	singleChar* ptr = (singleChar*) malloc(sizeof(singleChar));
 	// initialize the new char node in the linked list
 	ptr->contents = c;
@@ -77,7 +77,8 @@ void readChar(FILE *fp){
 	// first must get the amount of chars in the file in order to create the array
 	rewind(fp);
 	int c, charCount, uniqueChar = 0;
-	singleChar *head, *tail = NULL;
+	singleChar *head = NULL;
+	singleChar *tail = NULL;
     // loop through all the chars in the file
 	while((c = fgetc(fp)) != EOF){
 		charCount++;
@@ -100,7 +101,7 @@ void readChar(FILE *fp){
 	}
 	//
 	printf("Total Number of Chars: %i\nTotal Unique Chars: %i\n\n", charCount, uniqueChar);
-	
+
 	// after we create the linked list print out the contents
 	singleChar *curr = head;
 	while(curr != NULL){
@@ -108,12 +109,13 @@ void readChar(FILE *fp){
 		curr = curr -> nextChar;
 	}
 }
-	
+
 void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
-	
 	WORD* ptr = (WORD*) malloc(sizeof(WORD));
 	// initialize the new char node in the linked list
-	ptr->contents = word;
+	char* wordCpy = (char*) malloc(sizeof(char) * 100);
+	strcpy(wordCpy, word);
+	ptr->contents = wordCpy;
 	ptr->frequency = 1;
 	ptr->orderAppeared = pos;
 	ptr->nextWord = NULL;
@@ -123,6 +125,7 @@ void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
 		(*head) = ptr;
 		(*tail) = (*head);
 		(*len)++;
+		return;
 	}
 	else{
 		WORD *curr = (*head);
@@ -154,23 +157,25 @@ void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
 	}
 }
 
-void readWord(FILE* fp){
+void readWord(FILE* fp, int trackLongest){
 	// grab all of the words out of the file and put it in the structs
 	rewind(fp);
-	char word[50];
-	int wordCount, uniqueWord;
-	WORD *head, *tail = NULL;
+	int wordCount = 0, uniqueWord = 0;
+	char word[100];
+
+	WORD *head = NULL;
+	WORD *tail = NULL;
 	while(fscanf(fp, "%50s", word) != EOF){
 		wordCount++;
 		int match = 0;
-		WORD *ptr = head;
-		while(ptr != NULL){
-			if(strcmp(ptr->contents, word) == 0){
-				ptr->frequency++;
+		WORD *curr = head;
+		while(curr != NULL){
+			if(strcmp(curr->contents, word) == 0){
+				curr->frequency++;
 				match = 1;
 				break;
 			}
-			ptr = ptr->nextWord;
+			curr = curr->nextWord;
 		}
 		if(match){
 			continue;
@@ -181,29 +186,105 @@ void readWord(FILE* fp){
 	}
 	printf("Total Number of Words: %i\nTotal Unique Words:%i\n\n", wordCount, uniqueWord);
 
+	
 	WORD *curr = head;
 	while(curr != NULL){
-		printf("Word: %s, Freq: %i, Initial Position: %i", curr->contents, curr->frequency, curr->orderAppeared);
+		printf("Word: %s, Freq: %i, Initial Position: %i\n", curr->contents, curr->frequency, (curr->orderAppeared - 1));
+		curr = curr -> nextWord;
 	}
 }
 
-	
-	// // grab all of the individual lines
-	// fseek(fp, 0, SEEK_SET);
-	// char line[filesize];
-	// int lineCount;
-	// while(fgets(line, filesize, fp) != NULL){
-	// 	if(feof(fp)){
-	// 		printf("%i\n", lineCount);
-	// 		break;
-	// 	}
-	// 	printf("%s\n", line);
-	// 	lineCount++;
-	// }
+void addLine(char* line, LINE **head, LINE **tail, int* len, int pos, int size){
+	LINE* ptr = (LINE*) malloc(sizeof(LINE));
+	// initialize the new char node in the linked list
+	char* lineCpy = (char*) malloc(sizeof(char) * size);
+	strncpy(lineCpy, line, strlen(line)-1);
+	ptr->contents = lineCpy;
+	ptr->frequency = 1;
+	ptr->orderAppeared = pos;
+	ptr->nextLine = NULL;
+	ptr->prevLine = NULL;
+	// if linked list is empty insert at the start of the list
+	if((*head) == NULL){
+		(*head) = ptr;
+		(*tail) = (*head);
+		(*len)++;
+		return;
+	}
+	else{
+		LINE *curr = (*head);
+		while(strcmp((curr)->contents, line) < 0){
+			// insert at the end of the list
+			if(curr->nextLine == NULL){
+				curr->nextLine = ptr;
+				ptr->prevLine = curr;
+				(*tail) = ptr;
+				(*len)++;
+				return;
+			}
+			curr = curr->nextLine;
+		}
+		// insert at some position in the middle of the linked list
+		if(curr->prevLine == NULL){
+			curr->prevLine = ptr;
+			ptr->nextLine = curr;
+			(*head) = ptr;
+			(*len)++;
+		}
+		else{
+			ptr->nextLine = curr;
+			ptr->prevLine = curr->prevLine;
+			curr->prevLine->nextLine = ptr;
+			curr->prevLine = ptr;
+			(*len)++;
+		}
+	}
+}
 
-void readBatch(FILE *fp, long filesize){
+void readLine(FILE* fp, int filesize, int trackLongest){
+	rewind(fp);
+	int lineCount = 0, uniqueLine = 0;
+	char line[filesize];
+	LINE *head = NULL;
+	LINE *tail = NULL;
+	while(fgets(line, filesize, fp) != NULL){
+		if(strcmp(line,"\n") == 0){
+			continue;
+		}
+		lineCount++;
+		int match = 0;
+		LINE *curr = head;
+		while(curr != NULL){
+			if(strcmp(curr->contents, line) == 0){
+				curr->frequency++;
+				match = 1;
+				break;
+			}
+			curr = curr -> nextLine;
+		}
+		if(match){
+			continue;
+		}
+		else{
+			addLine(line, &head, &tail, &uniqueLine, lineCount, filesize);
+		}
+	}
+
+	if(feof(fp)){
+		printf("Total Number of Lines: %i\nTotal Unique Lines: %i\n\n", lineCount, uniqueLine);
+		
+		LINE *curr = head;
+		while(curr != NULL){
+			printf("Line: %s, Freq: %i, Initial Position: %i\n", curr->contents, curr->frequency, (curr->orderAppeared - 1));
+			curr = curr -> nextLine;
+		}
+
+	}
+}
+
+
+void readBatch(FILE *fp){
 	fseek(fp, 0, SEEK_SET);
-	printf("%i", (int) filesize);
 }
 
 int main(int argc, char* argv[]){
@@ -212,102 +293,85 @@ int main(int argc, char* argv[]){
     	printf("USAGE:\n\t./MADCounter -f <input file> -o <output file> -c -w -l -Lw -Ll\n\t\tOR\n\t./MADCounter -B <batch file>\n");
 		return(1);
     }
-    // ensure that all flags start with are correct 
-    char *flags[7] = {"-f", "-o", "-c", "-w", "-l", "-Lw", "-Ll"};
     // an int to keep track of which flags were used
-	int o_flag, c_flag, w_flag, o_pos = 0;
+	int f_flag=0, B_flag=0, o_flag=0, Lw_flag=0, Ll_flag=0;
+	int o_pos=0, f_pos=0, B_pos; 
     for(int i = 0; i < argc; i++){
     	if(strchr(argv[i],'-') > 0x0){
-    		for(int j = 0; j < 7; j++){
-				if(strcmp(argv[i],flags[j]) == 0){
-					if(strcmp(argv[i], "-o") == 0){
-						o_flag = 1;
-						o_pos = i;
-					}
-					else if(strcmp(argv[i], "-c") == 0){
-						c_flag = 1;
-					}
-					else if(strcmp(argv[i], "-w") == 0){
-						w_flag = 1;
-					}
-					break;
-				}
-				// if an incorrect flag has been used errror out
-				else if(i == 6){
-					printf("ERROR: Invalid Flag Types\n");
-					return(1);
-				}
+			if(strcmp(argv[i], "-f") == 0){
+				f_flag = 1;
+				f_pos=i;
 			}
-   		}	
-	}
-    // if -B is specified make sure we can open the batch file and it is not empty
-	// if -f is specified make sure we can open it
-	// if neither were specified error out
-	FILE *fp = fopen(argv[2], "rw");
-	// two ints to keep track of weither -B or -f was specified
-	int B_flag = 0;
-	if(strcmp(argv[1], "-B") == 0){
-		B_flag = 1;
-		// check a sucessful opening
-		if(fp == NULL){
-			fclose(fp);
-			printf("ERROR: Can't open batch file\n");
-			return(1);
+			else if(strcmp(argv[i], "-B") == 0){
+				B_flag = 1;
+				B_pos = i;
+			}
+			else if(strcmp(argv[i], "-o") == 0){
+				o_flag = 1;
+				o_pos = i;
+			}
+			else if(strcmp(argv[i], "-Lw") == 0){
+				Lw_flag = 1;
+			}
+			else if(strcmp(argv[i], "-Ll") == 0){
+				Ll_flag = 1;
+			}
+			else if((strcmp(argv[i], "-c") == 0) || (strcmp(argv[i], "-w") == 0) || (strcmp(argv[i], "-l") == 0)){
+				continue;
+			}
+			else{
+				printf("ERROR: Invalid Flag Types\n");
+				return(1);
+			}
 		}
-		// check to make sure the file is not empty
-		fseek(fp, 0, SEEK_END);
-		long fileSize = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-		if(fileSize == 0){
-			fclose(fp);
-			printf("ERROR: Batch File Empty\n");
-			return(1);	
-		}	
 	}
-	else if(strcmp(argv[1], "-f") == 0){
-		// make sure that the single file flag is not followed by another flag
-		if(strchr(argv[2], '-') != NULL){
-			fclose(fp);
+	FILE *fp;
+	if(B_flag == 1){
+		fp = fopen(argv[B_pos + 1], "rw");
+		readBatch(fp);
+	}
+	if(f_flag != 1){
+		printf("ERROR: No Input File Provided\n");
+		return(1);
+	}
+	else{
+		if((f_pos == (argc - 1)) | (strchr(argv[f_pos + 1],'-') > 0x0)){
 			printf("ERROR: No Input File Provided\n");
 			return(1);
 		}
-		// make sure we sucessfully open the file
+		fp = fopen(argv[f_pos + 1], "rw");
 		if(fp == NULL){
-			fclose(fp);
 			printf("ERROR: Can't open input file\n");
 			return(1);
 		}
 	}
-	else{
-		fclose(fp);
-		printf("ERROR: No Input File Provided\n");
-		return(1);
-	}
-	// if -o flag is specified make sure that there is an output file specificed
 	if(o_flag == 1){
-		if(strchr(argv[o_pos + 1], '-') != NULL){
-			fclose(fp);
+		if((o_pos == (argc - 1)) | (strchr(argv[o_pos + 1],'-') > 0x0)){
 			printf("ERROR: No Output File Provided\n");
 			return(1);
 		}
+		else{
+			freopen(argv[o_pos + 1], "a+", stdout);
+		}
 	}
-	// check to make sure that the input file is not empty
 	fseek(fp, 0, SEEK_END);
-   	long fileSize = ftell(fp);
-   	fseek(fp, 0, SEEK_SET);
-   	if(fileSize == 0){
-   		fclose(fp);
+	int filesize = ftell(fp);
+	if(filesize == 0){
 		printf("ERROR: Input File Empty\n");
 		return(1);
-   	}
-   	if(B_flag){
-   		readBatch(fp, fileSize);
-   	}
-   	else if(c_flag == 1){
-		readChar(fp);
 	}
-	else if(w_flag == 1){
-		readWord(fp);
+	rewind(fp);
+	// begin to execute the actual analysis functions
+	for(int i = 0; i > argc; i++){
+		if(strcmp(argv[i], "-c") == 0){
+			readChar(fp);
+		}
+		else if(strcmp(argv[i], "-w") == 0){
+			readWord(fp, Lw_flag);
+		}
+		else if(strcmp(argv[i], "-l") == 0){
+			readLine(fp, filesize, Ll_flag);
+		}
 	}
    	return(0);
 }
