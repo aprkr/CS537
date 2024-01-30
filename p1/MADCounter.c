@@ -20,18 +20,42 @@ typedef struct lines{
   struct word * prevLine;
 } LINE;
 
+typedef struct singleChar{
+	char contents;
+	int frequency;
+} SINGLECHAR;
+
 void readFile(FILE *fp, long filesize){
-	//gets all the chars out of a file and gets total
-	fseek(fp, 0, SEEK_SET);
+	// first must get the amount of chars in the file in order to create the array
+	rewind(fp);
 	int c, charCount = 0;
-	char *chars = malloc(filesize);
     while((c = fgetc(fp)) != EOF){
-    	chars[charCount++] = (char) c;
-    	printf("size of char array:%i\n", (int) sizeof(chars));
+		charCount++;
+	}
+	// after we find the size then we can create the array and sort it 
+	rewind(fp);
+	SINGLECHAR *chars = malloc(charCount * sizeof(SINGLECHAR));
+	for(int i = 0; i < charCount; i++){
+		c = fgetc(fp);
+		// check to see how many other instances of that char appear in the array
+		for(int j = 0; j < i; j++){
+			if(strcmp(chars[i].contents, chars[j].contents) == 0){
+				chars[i].frequency++;
+			}
+		}
+		for(in )
+			if(strcmp(chars[i].contents, chars[j].contents) == 1 && strcmp(chars[i + 1].contents, chars[j].contents) == 1){
+				
+				strcmp(chars[i].contents, chars[j].contents) == 1
+			}
+			else{
+
+			}
+		
 	}
 	printf("twas this many chars: %i\n", charCount);
-	for(int i = 0; i > (int) sizeof(chars); i++){
-		printf("%c",chars[i]);
+	for(int i = 0; i < charCount; i++){
+		printf("%c\n", chars[i]);
 	}
 	// grab all of the words out of the file and put it in the structs
 	fseek(fp, 0, SEEK_SET);
