@@ -64,7 +64,6 @@ void addChar(char c, singleChar **head, singleChar **tail, int* len, int pos){
 			(*head) = ptr;
 			(*len)++;
 		}
-		// otherwise we will need to insert at the front of the linked list
 		else{
 			ptr->nextChar = curr;
 			ptr->prevChar = curr->prevChar;
@@ -84,12 +83,9 @@ void readChar(FILE *fp, FILE* output, int mult){
     // loop through all the chars in the file
 	while((c = fgetc(fp)) != EOF){
 		charCount++;
-		// match tracks if this char alredy exsists in the linked list
 		int match = 0;
-		// start at the head and loop through each of them
 		singleChar *ptr = head;
 		while(ptr != NULL){
-			// if it already exsits increment the frequency member
 			if(ptr->contents == (char) c){
 				ptr->frequency++;
 				match = 1;
@@ -100,16 +96,14 @@ void readChar(FILE *fp, FILE* output, int mult){
 		if(match){
 			continue;
 		}
-		// if the char does not exsist add it to the linked list
 		else{
 			addChar((char) c, &head, &tail, &uniqueChar, charCount);
 		}
 	}
-	// if a flag has already been specified add a newline
+	//
 	if(mult){
 		fprintf(output, "\n");
 	}
-	// print out some stats
 	fprintf(output, "Total Number of Chars = %i\nTotal Unique Chars = %i\n\n", charCount, uniqueChar);
 
 	// after we create the linked list print out the contents
@@ -118,13 +112,6 @@ void readChar(FILE *fp, FILE* output, int mult){
 		fprintf(output, "Ascii Value: %d, Char: %c, Count: %i, Initial Position: %i\n", curr->contents, curr->contents, curr->frequency, (curr->pos) - 1);
 		curr = curr -> nextChar;
 	}
-	// free all the chars in the linked list
-	singleChar *freed = head -> nextChar;
-	while(freed != NULL){
-		free(freed -> prevChar);
-		freed = freed -> nextChar;
-	}
-	free(freed);
 }
 
 void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
@@ -165,7 +152,6 @@ void addWord(char* word, WORD **head, WORD **tail, int* len, int pos){
 			(*head) = ptr;
 			(*len)++;
 		}
-		// otherwise we will insert it at the head
 		else{
 			ptr->nextWord = curr;
 			ptr->prevWord = curr->prevWord;
@@ -227,13 +213,6 @@ void readLongestWord(FILE* fp, FILE* output, int mult){
 			fprintf(output, "\t%s\n", longest[i]->contents);
 		}
 	}
-	// free all the chars in the linked list
-	WORD *freed = head -> nextWord;
-	while(freed != NULL){
-		free(freed -> prevWord);
-		freed = freed -> nextWord;
-	}
-	free(freed);
 }
 
 void readWord(FILE* fp, FILE* output, int mult){
@@ -273,13 +252,6 @@ void readWord(FILE* fp, FILE* output, int mult){
 		fprintf(output, "Word: %s, Freq: %i, Initial Position: %i\n", curr->contents, curr->frequency, (curr->orderAppeared - 1));
 		curr = curr -> nextWord;
 	}
-	// free all the chars in the linked list
-	WORD *freed = head -> nextWord;
-	while(freed != NULL){
-		free(freed -> prevWord);
-		freed = freed -> nextWord;
-	}
-	free(freed);
 }
 
 void addLine(char* line, LINE **head, LINE **tail, int* len, int pos, int size){
@@ -386,13 +358,6 @@ void readLongestLine(FILE* fp, FILE* output, int filesize, int mult){
 			}
 		}
 	}
-	// free all the chars in the linked list
-	LINE *freed = head -> nextLine;
-	while(freed != NULL){
-		free(freed -> prevLine);
-		freed = freed -> nextLine;
-	}
-	free(freed);
 }
 
 void readLine(FILE* fp, FILE* output, int filesize, int mult){
@@ -435,17 +400,9 @@ void readLine(FILE* fp, FILE* output, int filesize, int mult){
 			curr = curr -> nextLine;
 		}
 	}
-	// free all the chars in the linked list
-	LINE *freed = head -> nextLine;
-	while(freed != NULL){
-		free(freed -> prevLine);
-		freed = freed -> nextLine;
-	}
-	free(freed);
 }
 
 int main(int argc, char* argv[]){
-	// set default print location to stdout
 	FILE* output = stdout;
 	// check to make sure minimum arguments have been passed in
     if((argc < 3) | (argc > 10)){
@@ -454,11 +411,9 @@ int main(int argc, char* argv[]){
     }
     // an int to keep track of which flags were used
 	int f_flag=0, B_flag=0, o_flag=0;
-	// positions to track the following flags
 	int o_pos=0, f_pos=0, B_pos=0; 
     for(int i = 0; i < argc; i++){
     	if(argv[i][0] == '-'){
-			// sets all the flags as well as the positions of the respective flag
 			if(strcmp(argv[i], "-f") == 0){
 				f_flag = 1;
 				f_pos=i;
@@ -474,7 +429,6 @@ int main(int argc, char* argv[]){
 			else if((strcmp(argv[i], "-c") == 0) || (strcmp(argv[i], "-w") == 0) || (strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-Lw") == 0) || strcmp(argv[i], "-Ll") == 0){
 				continue;
 			}
-			// if none of the flags are given then throw an error
 			else{
 				fprintf(output, "ERROR: Invalid Flag Types\n");
 				return(1);
@@ -482,15 +436,12 @@ int main(int argc, char* argv[]){
 		}
 	}
 	FILE *fp;
-	// create a recursive way to read the batch file
 	if(B_flag == 1){
-		// check to make sure that the batch file can be opened
 		fp = fopen(argv[B_pos + 1], "rw");
 		if(fp == NULL){
 			fprintf(output, "ERROR: Can't open batch file\n");
 			return(1);
 		}
-		// track the filesize, if empty throw an error
 		fseek(fp, 0, SEEK_END);
 		int filesize = ftell(fp);
 		rewind(fp);
@@ -498,28 +449,21 @@ int main(int argc, char* argv[]){
 			fprintf(output, "ERROR: Batch File Empty\n");
 			return(1);
 		}
-		// create the variables that will hold argv and argc 
 		char line[filesize];
 		char* word = (char*) malloc(sizeof(char) * 100);
 		int lines = 0;
-		// tracks how many lines are in the batch file
 		while(fgets(line, filesize, fp) != NULL){
 			lines++;
 		}
-		// once we are at the end of the file we can calculate argc and argv
 		if(feof(fp)){
 			rewind(fp);
 			for(int i = 0; i < lines; i++){
 				int argcount = 0;
 				int c = 0;
-				// need to save the position so when we can count the args and restore it for the actual arg strings
-				// this has to be offset by one due to the newline
 				if(i > 0){
 					fseek(fp, 1, SEEK_CUR);
 				}
-				// otherwise we dont need to consider the newline so just save the fp
 				long offset = ftell(fp);
-				// count the spaces and add one to get the argc
 				while(c != '\n' && c != EOF){
 					c = fgetc(fp);
 					if(c == ' '){
@@ -530,7 +474,6 @@ int main(int argc, char* argv[]){
 					continue;
 				}
 				argcount++;
-				// reset the file pointer so we can get the args
 				fseek(fp, offset, SEEK_SET);
 				char* argvars[argcount];
 				for(int j = 0; j < argcount; j++){
@@ -539,33 +482,26 @@ int main(int argc, char* argv[]){
 					strcpy(wrdCpy, word);
 					argvars[j] = wrdCpy;
 				}
-				// run it with the new arguments
 				main(argcount, argvars);
 			}
 		}
-		// free the malloc'd word
-		free(word);
 		return(0);
 	}
-	// if the -f was not specified throw and error
 	if(f_flag != 1){
 		fprintf(output, "ERROR: No Input File Provided\n");
 		return(1);
 	}
 	else{
-		// check to make sure that the first char of the filename is not '-'
 		if((f_pos == (argc - 1)) || argv[f_pos + 1][0] == '-'){
 			fprintf(output, "ERROR: No Input File Provided\n");
 			return(1);
 		}
-		// try to open the file and if it failed throw and error
 		fp = fopen(argv[f_pos + 1], "rw");
 		if(fp == NULL){
 			fprintf(output, "ERROR: Can't open input file\n");
 			return(1);
 		}
 	}
-	// if -o is spefied we must switch where fprintf() is printed to
 	if(o_flag == 1){
 		if((o_pos == (argc - 1)) | (strchr(argv[o_pos + 1],'-') > 0x0)){
 			fprintf(output, "ERROR: No Output File Provided\n");
@@ -575,7 +511,6 @@ int main(int argc, char* argv[]){
 			output = fopen(argv[o_pos + 1], "w+");
 		}
 	}
-	// make sure that the file we are reading is not empty
 	fseek(fp, 0, SEEK_END);
 	int filesize = ftell(fp);
 	if(filesize == 0){
@@ -607,8 +542,5 @@ int main(int argc, char* argv[]){
 			mult = 1;
 		}
 	}
-	// make sure to close the already opened files
-	fclose(output);
-	fclose(fp);
    	return(0);
 }
