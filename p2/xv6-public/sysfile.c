@@ -329,7 +329,7 @@ sys_open(void)
   f->off = 0;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
-  strcpy(f->name,  &path);
+  safestrcpy(f->name, path, 256);
   return fd;
 }
 
@@ -447,10 +447,14 @@ sys_pipe(void)
 int
 sys_getfilename(void){
   int fd;
-  char* buffer;
+  char *buffer;
   int n;
 
-  struct file f;
+  struct file *f;
+
+  argint(0, &fd);
+  argstr(1, &buffer);
+  argint(2, &n);
 
   if(argfd(0, &fd, &f) < 0)
     return -1;
@@ -458,8 +462,7 @@ sys_getfilename(void){
   if(buffer == 0)
     return -1;
 
-  
-  buffer = f.name;
+  safestrcpy(buffer, f->name, 256);
 
   return 0;
 
