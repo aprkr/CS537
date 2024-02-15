@@ -17,8 +17,7 @@ int main(int argc, char* argv[]){
             printf("wsh> ");
             getline(&cmd, &cmd_len, stdin);
             // split up the input so the args and cmd can be passed seperatly
-            strtok();
-            execvp(cmd);
+            printf("%s", cmd);
         }
         // batch mode
         else{
