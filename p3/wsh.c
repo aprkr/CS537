@@ -144,30 +144,29 @@ int check_builtin(int argCount, char* args[]){
             exit(-1);
         }
         // Replace '=' with '\0' to split the string into the two seperate args to setenv
-        *equal_sign = '\0'; 
-        char *variable = input;
-        char *value = equal_sign + 1;
-        // Remove quotes from the value if present
-        if (value[0] == '\"' && value[strlen(value) - 1] == '\"') {
-            value[strlen(value) - 1] = '\0';
-            value++;
-        }
+        *equal_sign = '\0';
+        // grab both the variable name and the value
+        char *variable = (char*) malloc(strlen(input) * sizeof(char));
+        strcpy(variable, input);
+        char *value = (char*) malloc(strlen(equal_sign + 1) * sizeof(char));
+        strcpy(value, equal_sign + 1);
         // create new shell var that will be stored in the linked list
         SHELLVAR* new = (SHELLVAR*) malloc(sizeof(SHELLVAR));
         if(new == NULL){
             printf("Failed to set the local variable\n");
             exit(-1);
         }
+        // set the struct to hold info
         new->name = variable;
         new->value = value;
         new->nextVar = NULL;
-
+        // insert at the end of the linked list
         if(head == NULL){
             head = new;
         }
         else{
             SHELLVAR* curr = head;
-            while(curr != NULL){
+            while(curr->nextVar != NULL){
                 curr = curr->nextVar;
             }
             curr->nextVar = new;
@@ -241,7 +240,6 @@ void addCmdHist(char* args[], int argc){
 int main() {
     char input[MAX_INPUT_SIZE];
     char *args[MAX_ARGS];
-
     while (1) {
         // Read input from the user
         read_input(input);
