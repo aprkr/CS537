@@ -8,6 +8,20 @@
 #define MAX_INPUT_SIZE 2048
 #define MAX_ARGS 128
 
+// a struct to hold the local variables in a linked list
+typedef struct shellVar{
+    char* name;
+    char* value;
+    struct shellVar * nextVar;
+} SHELLVAR;
+
+
+// global head to our linked list
+SHELLVAR* head = NULL;
+
+// a history array to keep all the commands neatly organized
+char history[5][MAX_INPUT_SIZE] = {"", "", "", "", ""};
+
 void read_input(char *input){
     // prompt user and get input from them
     printf("wsh> ");
@@ -34,6 +48,169 @@ int parse_input(char* input, char *args[]){
     return argc;
 }
 
+int check_builtin(int argCount, char* args[]){
+    // EXIT
+    if(strcmp(args[0], "exit") == 0){
+        exit(0);
+    }
+    // CD
+    else if(strcmp(args[0], "cd") == 0){
+        // check to make sure that the cd command only has one arg after it
+        if(argCount != 2){
+            printf("ERROR: Usage cd <path>\n");
+            exit(-1);
+        }
+        else{
+            // if chdir is sucessfull it will return zero, if non-zero error out
+            if (chdir(args[0]) != 0){
+                printf("cd to %s failed\n", args[1]);
+                exit(-1);
+            }
+            // return 1 to notify main loop to prompt again
+            return 1;
+        }
+    }
+    // EXPORT
+    else if(strcmp(args[0], "export") == 0){
+        // check to make sure that there is only two arguments supplied
+        if(argCount != 2){
+            printf("ERROR: Usage export VAR=<value>\n");
+            exit(-1);
+        }
+        else{
+            // Parse the input to extract the variable name and value
+            char *input = args[1];
+            char *equal_sign = strchr(input, '=');
+            if (equal_sign == NULL) {
+                printf("ERROR: Usage export VAR=<value>\n");
+                exit(-1);
+            }
+            // Replace '=' with '\0' to split the string into the two seperate args to setenv
+            *equal_sign = '\0'; 
+            char *variable = input;
+            char *value = equal_sign + 1;
+            // Remove quotes from the value if present
+            if (value[0] == '\"' && value[strlen(value) - 1] == '\"') {
+                value[strlen(value) - 1] = '\0';
+                value++;
+            }
+            // Set the environment variable
+            if (setenv(variable, value, 1) != 0) {
+                printf("Failed to set the enviroment variable\n");
+                exit(-1);
+            }
+        }
+        return 1;
+    }
+    // LOCAL
+    else if(strcmp(args[0], "local") == 0){
+        // check to make sure that there is only two arguments supplied
+        if(argCount != 2){
+            printf("ERROR: Usage local VAR=<value>\n");
+            exit(-1);
+        }
+        // Parse the input to extract the variable name and value
+        char *input = args[1];
+        char *equal_sign = strchr(input, '=');
+        if (equal_sign == NULL) {
+            printf("ERROR: Usage local VAR=<value\n");
+            exit(-1);
+        }
+        // Replace '=' with '\0' to split the string into the two seperate args to setenv
+        *equal_sign = '\0'; 
+        char *variable = input;
+        char *value = equal_sign + 1;
+        // Remove quotes from the value if present
+        if (value[0] == '\"' && value[strlen(value) - 1] == '\"') {
+            value[strlen(value) - 1] = '\0';
+            value++;
+        }
+        // create new shell var that will be stored in the linked list
+        SHELLVAR* new = (SHELLVAR*) malloc(sizeof(SHELLVAR));
+        if(new == NULL){
+            printf("Failed to set the local variable\n");
+            exit(-1);
+        }
+        new->name = variable;
+        new->value = value;
+        new->nextVar = NULL;
+
+        if(head == NULL){
+            head = new;
+        }
+        else{
+            SHELLVAR* curr = head;
+            while(curr->nextVar != NULL){
+                curr = curr->nextVar;
+            }
+            curr->nextVar = new;
+        }
+        return 1;
+    }
+    // VARS
+    else if(strcmp(args[0], "vars") == 0){
+        SHELLVAR* curr = head;
+        // iterate through the linked list to print the local vars
+        while(curr->nextVar != NULL){
+            printf("%s=%s", curr->name, curr->value);
+            curr = curr->nextVar;
+        }
+        return 1;
+    }
+    // HISTORY
+    else if(strcmp(args[0], "history") == 0){
+        for(int i = 0; i < 5; i++){
+            if(strcmp(history[i],"") == 0){
+                break;
+            }
+            else{
+                printf("%i) %s\n", (i + 1), history[i]);
+            }
+        }
+        return 1;
+    }
+    else{
+        // command was not built in so we will use execvp
+        return 0;
+    }
+}
+
+void addCmdHist(char* args[], int argc){
+    // Calculate the total length of the concatenated string
+    int totalLength = 0;
+    for (int i = 0; i < argc; i++) {
+        totalLength += strlen(args[i]);
+    }
+
+    // Space between strings
+    totalLength += argc - 1;
+
+    // Allocate memory for the concatenated string (+1 for the null terminator)
+    char* concatenatedString = (char*)malloc(totalLength + 1);
+    // Copy each string from the array into the concatenated string
+    int currentIndex = 0;
+    for (int i = 0; i < argc; i++) {
+        strcpy(concatenatedString + currentIndex, args[i]);
+        currentIndex += strlen(args[i]);
+        // add back the space in between the args
+        if (i < argc - 1) {
+            concatenatedString[currentIndex++] = ' '; // Add space
+        }
+    }
+
+    // Add null terminator at the end
+    concatenatedString[currentIndex] = '\0';
+
+    // shift all of the history down unless the most recent command
+    for(int i = 3; i >= 0; i--){
+        if(strcmp(history[0], concatenatedString) == 0){
+            break;
+        }
+        strcpy(history[i+1], history[i]);
+    }
+    strcpy(history[0], concatenatedString);
+}
+
 int main() {
     char input[MAX_INPUT_SIZE];
     char *args[MAX_ARGS];
@@ -47,6 +224,11 @@ int main() {
         if(argCount == 0){
             continue;
         }
+        // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
+        if(check_builtin(argCount, args) == 1){
+            addCmdHist(args, argCount);
+            continue;
+        }
         // Execute the command
         pid_t pid = fork();
         // exec the program in the child process so the shell or parent process can wait for it to finish
@@ -55,11 +237,13 @@ int main() {
             execvp(args[0], args);
             // If execvp returns, it means an error occurred
             perror("execvp");
+            exit(-1);
         } else {
             // Parent process - here we will wait for the child command to finish
             int status;
             waitpid(pid, &status, 0);
         }
+        addCmdHist(args, argCount);
     }
     return 0;
 }
