@@ -176,10 +176,16 @@ int check_builtin(int argCount, char* args[]){
     // VARS
     else if(strcmp(args[0], "vars") == 0){
         SHELLVAR* curr = head;
+        // if there are none then just print the newline
+        if(curr == NULL){
+            printf("\r");
+        }
         // iterate through the linked list to print the local vars
-        while(curr->nextVar != NULL){
-            printf("%s=%s", curr->name, curr->value);
-            curr = curr->nextVar;
+        else{
+            while(curr != NULL){
+                printf("%s=%s\n", curr->name, curr->value);
+                curr = curr->nextVar;
+            }
         }
         return 1;
     }
