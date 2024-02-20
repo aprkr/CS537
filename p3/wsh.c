@@ -22,6 +22,18 @@ SHELLVAR* head = NULL;
 // a history array to keep all the commands neatly organized
 char history[5][MAX_INPUT_SIZE] = {"", "", "", "", ""};
 
+char* getLocalVar(char* var){
+    SHELLVAR* curr = head;
+    while(curr != NULL){
+        if(strcmp(curr->name, var) == 0){
+            return curr->value;
+        }
+        curr = curr->nextVar;
+    }
+    return NULL;
+}
+
+
 void read_input(char *input){
     // prompt user and get input from them
     printf("wsh> ");
@@ -40,6 +52,21 @@ int parse_input(char* input, char *args[]){
     // seperates the args by spaces
     char *token = strtok(input, " ");
     while (token != NULL && argc < MAX_ARGS - 1) {
+        // check to see if the arg is a variable
+        char* signPos = strchr(token, '$');
+        if((signPos != NULL) && (signPos - token == 0)){
+            char* var = token + sizeof(char);
+            // if it is then check to see if it is a env var
+            token = getenv(var);
+            // if not check to see if it is a local var
+            if(token == NULL){
+                token = getLocalVar(var);
+                // if not a local var then set token to be the default "" string
+                if(token == NULL){
+                    token = "";
+                }
+            }
+        }
         args[argc++] = token;
         token = strtok(NULL, " ");
     }
@@ -140,7 +167,7 @@ int check_builtin(int argCount, char* args[]){
         }
         else{
             SHELLVAR* curr = head;
-            while(curr->nextVar != NULL){
+            while(curr != NULL){
                 curr = curr->nextVar;
             }
             curr->nextVar = new;
