@@ -89,7 +89,7 @@ int check_builtin(int argCount, char* args[]){
         }
         else{
             // if chdir is sucessfull it will return zero, if non-zero error out
-            if (chdir(args[0]) != 0){
+            if (chdir(args[1]) != 0){
                 printf("cd to %s failed\n", args[1]);
                 exit(-1);
             }
