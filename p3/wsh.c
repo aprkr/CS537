@@ -247,7 +247,7 @@ int check_builtin(int argCount, char* args[]){
             }
         }
         else if((argCount == 2)){
-            for(int i; i < strtol(args[1], NULL, 10) - 1; i++){
+            for(int i = 0; i < strtol(args[1], NULL, 10) - 1; i++){
                 curr = curr->nextNode;
                 if(curr == NULL){
                     return 1;
@@ -276,6 +276,15 @@ int check_builtin(int argCount, char* args[]){
         }
         else if(argCount == 3){
             historyLen = strtol(args[2], NULL, 10);
+            for(int i = 0; i < strtol(args[2], NULL, 10) - 1; i++){
+                if(curr == NULL){
+                    break;
+                }
+                curr = curr->nextNode;
+            }
+            if(curr != NULL){
+                curr->nextNode = NULL;
+            }
         }
         return 1;
     }
@@ -311,6 +320,11 @@ void addCmdHist(char* args[], int argc){
     // Add null terminator at the end
     concatenatedString[currentIndex] = '\0';
 
+    // do not add to list if is already at the head
+    if(historyHead != NULL && strcmp(historyHead->content, concatenatedString) == 0){
+        return;
+    }
+
     // create new node in the history linked list
     HISTORYNODE* new = (HISTORYNODE*) malloc(sizeof(HISTORYNODE));
     // assign values to the created struct
@@ -318,7 +332,7 @@ void addCmdHist(char* args[], int argc){
     new->nextNode = NULL;
 
     // create the list that will hold all of the history entries
-    if(historyHead== NULL){
+    if(historyHead == NULL){
         historyHead = new;
     }
     else{
