@@ -40,6 +40,10 @@ SHELLVAR* getLocalVar(char* var){
     return NULL;
 }
 
+void executePipe(){
+
+}
+
 void addLocalVar(int argCount, char* args[]){
     // Parse the input to extract the variable name and value
     char *input = args[1];
@@ -341,37 +345,81 @@ void addCmdHist(char* args[], int argc){
     }
 }
 
-int main() {
-    char input[MAX_INPUT_SIZE];
-    char *args[MAX_ARGS];
-    while (1) {
-        // Read input from the user
-        read_input(input);
-        // Parse input into arguments
-        int argCount = parse_input(input, args);
-        // if nothing was entered just prompt again
-        if(argCount == 0){
-            continue;
+int main(int argc, char* args[]) {
+    // launch interactive mode
+    if(argc == 1){
+        char input[MAX_INPUT_SIZE];
+        char *argsCMD[MAX_ARGS];
+        while (1) {
+            // Read input from the user
+            read_input(input);
+            // Parse input into arguments
+            int argCount = parse_input(input, argsCMD);
+            // if nothing was entered just prompt again
+            if(argCount == 0){
+                continue;
+            }
+            // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
+            if(check_builtin(argCount, argsCMD) == 1){
+                continue;
+            }
+            // Execute the command
+            pid_t pid = fork();
+            // exec the program in the child process so the shell or parent process can wait for it to finish
+            if (pid == 0) {
+                // Child process - here we will execute the command
+                execvp(argsCMD[0], argsCMD);
+                // If execvp returns, it means an error occurred
+                perror("execvp");
+                exit(-1);
+            } else {
+                // Parent process - here we will wait for the child command to finish
+                int status;
+                waitpid(pid, &status, 0);
+            }
+            addCmdHist(argsCMD, argCount);
         }
-        // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
-        if(check_builtin(argCount, args) == 1){
-            continue;
-        }
-        // Execute the command
-        pid_t pid = fork();
-        // exec the program in the child process so the shell or parent process can wait for it to finish
-        if (pid == 0) {
-            // Child process - here we will execute the command
-            execvp(args[0], args);
-            // If execvp returns, it means an error occurred
-            perror("execvp");
-            exit(-1);
-        } else {
-            // Parent process - here we will wait for the child command to finish
-            int status;
-            waitpid(pid, &status, 0);
-        }
-        addCmdHist(args, argCount);
+        return 0;
     }
-    return 0;
+    // launch batch mode
+    else{
+        FILE *file;
+        char line[MAX_INPUT_SIZE];
+        char *argsCMD[MAX_ARGS];
+
+        file = fopen(args[1], "r");
+
+        if (file == NULL) {
+            printf("Error opening file\n");
+            return 1;
+        }
+        while (fgets(line, sizeof(line), file) != NULL) {
+            int argCount = parse_input(line, argsCMD);
+            // if nothing was entered just prompt again
+            if(argCount == 0){
+                continue;
+            }
+            // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
+            if(check_builtin(argCount, argsCMD) == 1){
+                continue;
+            }
+            // Execute the command
+            pid_t pid = fork();
+            // exec the program in the child process so the shell or parent process can wait for it to finish
+            if (pid == 0) {
+                // Child process - here we will execute the command
+                execvp(argsCMD[0], argsCMD);
+                // If execvp returns, it means an error occurred
+                perror("execvp");
+                exit(-1);
+            } else {
+                // Parent process - here we will wait for the child command to finish
+                int status;
+                waitpid(pid, &status, 0);
+            }
+            addCmdHist(argsCMD, argCount);
+        }
+        return 0;
+    }
+    
 }
