@@ -457,7 +457,7 @@ int main(int argc, char* args[]) {
                     piped = 1;
                     executePipe(argsCMD, argCount);
                     addCmdHist(argsCMD, argCount);
-                    continue;
+                    break;
                 }
             }
             if(piped == 1){
