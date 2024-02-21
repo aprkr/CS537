@@ -233,13 +233,49 @@ int check_builtin(int argCount, char* args[]){
     }
     // HISTORY
     else if(strcmp(args[0], "history") == 0){
-        for(int i = 0; i < 5; i++){
-            if(strcmp(history[i],"") == 0){
-                break;
+        HISTORYNODE* curr = historyHead;
+        if(curr == NULL){
+            return 1;
+        }
+        if(argCount == 1){
+            for(int i = 0; i < historyLen; i++){
+                printf("%i) %s\n", (i + 1), curr->content);
+                curr = curr->nextNode;
+                if(curr == NULL){
+                    break;
+                }
             }
-            else{
-                printf("%i) %s\n", (i + 1), history[i]);
+        }
+        else if((argCount == 2)){
+            for(int i; i < strtol(args[1], NULL, 10) - 1; i++){
+                curr = curr->nextNode;
+                if(curr == NULL){
+                    return 1;
+                }
             }
+            char *args[MAX_ARGS];
+            // Parse input into arguments
+            char* cmd = (char*) malloc(sizeof(char) * strlen(curr->content));
+            strcpy(cmd, curr->content);
+            parse_input(cmd, args);
+            // Execute the command
+            pid_t pid = fork();
+            // exec the program in the child process so the shell or parent process can wait for it to finish
+            if (pid == 0) {
+                // Child process - here we will execute the command
+                execvp(args[0], args);
+                // If execvp returns, it means an error occurred
+                perror("execvp");
+                exit(-1);
+            } else {
+                // Parent process - here we will wait for the child command to finish
+                int status;
+                waitpid(pid, &status, 0);
+            }
+            free(cmd);
+        }
+        else if(argCount == 3){
+            historyLen = strtol(args[2], NULL, 10);
         }
         return 1;
     }
@@ -275,7 +311,20 @@ void addCmdHist(char* args[], int argc){
     // Add null terminator at the end
     concatenatedString[currentIndex] = '\0';
 
-    
+    // create new node in the history linked list
+    HISTORYNODE* new = (HISTORYNODE*) malloc(sizeof(HISTORYNODE));
+    // assign values to the created struct
+    new->content=concatenatedString;
+    new->nextNode = NULL;
+
+    // create the list that will hold all of the history entries
+    if(historyHead== NULL){
+        historyHead = new;
+    }
+    else{
+        new->nextNode = historyHead;
+        historyHead = new;
+    }
 }
 
 int main() {
