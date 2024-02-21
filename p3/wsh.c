@@ -394,6 +394,7 @@ int main(int argc, char* args[]) {
             return 1;
         }
         while (fgets(line, sizeof(line), file) != NULL) {
+            line[strcspn(line, "\n")] = '\0';
             int argCount = parse_input(line, argsCMD);
             // if nothing was entered just prompt again
             if(argCount == 0){
