@@ -234,7 +234,7 @@ int check_builtin(int argCount, char* args[]){
     // HISTORY
     else if(strcmp(args[0], "history") == 0){
         HISTORYNODE* curr = historyHead;
-        if(curr == NULL){
+        if(curr == NULL && argCount != 3){
             return 1;
         }
         if(argCount == 1){
