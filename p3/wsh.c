@@ -13,26 +13,98 @@ typedef struct shellVar{
     char* name;
     char* value;
     struct shellVar * nextVar;
+    struct shellVar * prevVar;
 } SHELLVAR;
-
 
 // global head to our linked list
 SHELLVAR* head = NULL;
 
 // a history array to keep all the commands neatly organized
-char history[5][MAX_INPUT_SIZE] = {"", "", "", "", ""};
+typedef struct historyNode{
+    char* content;
+    struct historyNode * nextNode;
+} HISTORYNODE;
 
-char* getLocalVar(char* var){
+// head to enter the history 
+HISTORYNODE* historyHead = NULL;
+int historyLen = 5;
+
+SHELLVAR* getLocalVar(char* var){
     SHELLVAR* curr = head;
     while(curr != NULL){
         if(strcmp(curr->name, var) == 0){
-            return curr->value;
+            return curr;
         }
         curr = curr->nextVar;
     }
     return NULL;
 }
 
+void addLocalVar(int argCount, char* args[]){
+    // Parse the input to extract the variable name and value
+    char *input = args[1];
+    char *equal_sign = strchr(input, '=');
+    if (equal_sign == NULL) {
+        printf("ERROR: Usage local VAR=<value\n");
+        exit(-1);
+    }
+    // Replace '=' with '\0' to split the string into the two seperate args to setenv
+    *equal_sign = '\0';
+    // grab both the variable name and the value
+    char *variable = (char*) malloc(strlen(input) * sizeof(char));
+    strcpy(variable, input);
+    char *value = (char*) malloc(strlen(equal_sign + 1) * sizeof(char));
+    strcpy(value, equal_sign + 1);
+    
+    SHELLVAR* loc = getLocalVar(variable);
+    if(loc != NULL){
+        // if it is set to the empty string then delete it from the linked list
+        if(strcmp(value, "") == 0){
+        	if(loc == head){
+        		head = loc->nextVar;
+                free(loc);
+        	}
+        	else{
+        		SHELLVAR* next = loc->nextVar;
+        		SHELLVAR* prev = loc->prevVar;
+                if(next != NULL){
+					next->prevVar = prev;	
+				}
+				if(prev != NULL){
+					prev->nextVar = next;
+				}
+        	}
+        }
+        else{
+            loc->value = value;
+        }
+    }
+    else{
+        // create new shell var that will be stored in the linked list
+        SHELLVAR* new = (SHELLVAR*) malloc(sizeof(SHELLVAR));
+        if(new == NULL){
+            printf("Failed to set the local variable\n");
+            exit(-1);
+        }
+        // set the struct to hold info
+        new->name = variable;
+        new->value = value;
+        new->nextVar = NULL;
+        new->prevVar = NULL;
+        // insert at the end of the linked list
+        if(head == NULL){
+            head = new;
+        }
+        else{
+            SHELLVAR* curr = head;
+            while(curr->nextVar != NULL){
+                curr = curr->nextVar;
+            }
+            curr->nextVar = new;
+            new->prevVar = curr;
+        }
+    }
+}
 
 void read_input(char *input){
     // prompt user and get input from them
@@ -56,14 +128,18 @@ int parse_input(char* input, char *args[]){
         char* signPos = strchr(token, '$');
         if((signPos != NULL) && (signPos - token == 0)){
             char* var = token + sizeof(char);
-            // if it is then check to see if it is a env var
+            // if it is then check to see if it is a local var
             token = getenv(var);
-            // if not check to see if it is a local var
+            // if not check to see if it is a env var
             if(token == NULL){
-                token = getLocalVar(var);
+                SHELLVAR* localVar = getLocalVar(var);
                 // if not a local var then set token to be the default "" string
-                if(token == NULL){
-                    token = "";
+                if(localVar == NULL){
+                    token = strtok(NULL, " ");
+                    continue;
+                }
+                else{
+                    token = localVar->value;
                 }
             }
         }
@@ -136,41 +212,7 @@ int check_builtin(int argCount, char* args[]){
             printf("ERROR: Usage local VAR=<value>\n");
             exit(-1);
         }
-        // Parse the input to extract the variable name and value
-        char *input = args[1];
-        char *equal_sign = strchr(input, '=');
-        if (equal_sign == NULL) {
-            printf("ERROR: Usage local VAR=<value\n");
-            exit(-1);
-        }
-        // Replace '=' with '\0' to split the string into the two seperate args to setenv
-        *equal_sign = '\0';
-        // grab both the variable name and the value
-        char *variable = (char*) malloc(strlen(input) * sizeof(char));
-        strcpy(variable, input);
-        char *value = (char*) malloc(strlen(equal_sign + 1) * sizeof(char));
-        strcpy(value, equal_sign + 1);
-        // create new shell var that will be stored in the linked list
-        SHELLVAR* new = (SHELLVAR*) malloc(sizeof(SHELLVAR));
-        if(new == NULL){
-            printf("Failed to set the local variable\n");
-            exit(-1);
-        }
-        // set the struct to hold info
-        new->name = variable;
-        new->value = value;
-        new->nextVar = NULL;
-        // insert at the end of the linked list
-        if(head == NULL){
-            head = new;
-        }
-        else{
-            SHELLVAR* curr = head;
-            while(curr->nextVar != NULL){
-                curr = curr->nextVar;
-            }
-            curr->nextVar = new;
-        }
+        addLocalVar(argCount, args);
         return 1;
     }
     // VARS
@@ -178,7 +220,7 @@ int check_builtin(int argCount, char* args[]){
         SHELLVAR* curr = head;
         // if there are none then just print the newline
         if(curr == NULL){
-            printf("\r");
+            return 1;
         }
         // iterate through the linked list to print the local vars
         else{
@@ -233,14 +275,7 @@ void addCmdHist(char* args[], int argc){
     // Add null terminator at the end
     concatenatedString[currentIndex] = '\0';
 
-    // shift all of the history down unless the most recent command
-    for(int i = 3; i >= 0; i--){
-        if(strcmp(history[0], concatenatedString) == 0){
-            break;
-        }
-        strcpy(history[i+1], history[i]);
-    }
-    strcpy(history[0], concatenatedString);
+    
 }
 
 int main() {
@@ -257,7 +292,6 @@ int main() {
         }
         // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
         if(check_builtin(argCount, args) == 1){
-            addCmdHist(args, argCount);
             continue;
         }
         // Execute the command
