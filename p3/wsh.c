@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #define MAX_INPUT_SIZE 2048
 #define MAX_ARGS 128
@@ -40,8 +41,14 @@ SHELLVAR* getLocalVar(char* var){
     return NULL;
 }
 
-void executePipe(){
-
+// Function to trim leading and trailing whitespace from a string
+char *trim_whitespace(char *str) {
+    while (isspace((unsigned char)*str)) str++; // Trim leading whitespace
+    if (*str == 0) return str; // If the string is empty after trimming leading whitespace, return
+    char *end = str + strlen(str) - 1; // Pointer to the last character of the string
+    while (end > str && isspace((unsigned char)*end)) end--; // Trim trailing whitespace
+    end[1] = '\0'; // Null-terminate the trimmed string
+    return str;
 }
 
 void addLocalVar(int argCount, char* args[]){
@@ -153,6 +160,85 @@ int parse_input(char* input, char *args[]){
     // list of args must be null-terminated to work with execvp
     args[argc] = NULL;
     return argc;
+}
+
+void executePipe(char* args[], int argc){
+    // Calculate the total length of the concatenated string
+    int totalLength = 0;
+    for (int i = 0; i < argc; i++) {
+        totalLength += strlen(args[i]);
+    }
+
+    // Space between strings
+    totalLength += argc - 1;
+
+    // Allocate memory for the concatenated string (+1 for the null terminator)
+    char* concatenatedString = (char*)malloc(totalLength + 1);
+    // Copy each string from the array into the concatenated string
+    int currentIndex = 0;
+    for (int i = 0; i < argc; i++) {
+        strcpy(concatenatedString + currentIndex, args[i]);
+        currentIndex += strlen(args[i]);
+        // add back the space in between the args
+        if (i < argc - 1) {
+            concatenatedString[currentIndex++] = ' '; // Add space
+        }
+    }
+
+    // Add null terminator at the end
+    concatenatedString[currentIndex] = '\0';
+    
+    char *token;
+    char *commands[10]; // Max 10 commands, adjust as needed
+    int i = 0;
+
+    // Split the command into individual commands based on the pipe character "|"
+    token = strtok(concatenatedString, "|");
+    while (token != NULL) {
+        commands[i++] = trim_whitespace(token);
+        token = strtok(NULL, "|");
+    }
+    commands[i] = NULL;
+
+    int fd[2]; // File descriptors for pipe
+    pid_t pid;
+    int prev_read = 0; // File descriptor to store the previous command's output
+
+    // Iterate over each command
+    for (int j = 0; j < i; j++) {
+        pipe(fd); // Create a pipe for communication between commands
+
+        if ((pid = fork()) == -1) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid == 0) {
+            // Child process
+
+            // Redirect stdin if not the first command
+            if (j != 0) {
+                dup2(prev_read, 0);
+                close(prev_read);
+            }
+
+            // Redirect stdout if not the last command
+            if (j != i - 1) {
+                dup2(fd[1], 1);
+            }
+
+            char *argsCMD[MAX_ARGS];
+            parse_input(commands[j], argsCMD);
+
+            close(fd[0]); // Close unused read end
+            execvp(argsCMD[0], argsCMD);
+            perror(commands[j]);
+            exit(EXIT_FAILURE);
+        } else {
+            // Parent process
+            wait(NULL); // Wait for child process to finish
+            close(fd[1]); // Close write end to avoid deadlock
+            prev_read = fd[0]; // Store read end for the next command
+        }
+    }
 }
 
 int check_builtin(int argCount, char* args[]){
@@ -362,6 +448,20 @@ int main(int argc, char* args[]) {
             // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
             if(check_builtin(argCount, argsCMD) == 1){
                 continue;
+             }
+            // check to see if it is a piped command
+            int piped = 0;
+            for(int i = 0; i < argCount; i++){
+                char* signPipe = strchr(argsCMD[i], '|');
+                if(signPipe != NULL){
+                    piped = 1;
+                    executePipe(argsCMD, argCount);
+                    addCmdHist(argsCMD, argCount);
+                    continue;
+                }
+            }
+            if(piped == 1){
+                continue;
             }
             // Execute the command
             pid_t pid = fork();
@@ -403,6 +503,15 @@ int main(int argc, char* args[]) {
             // check to see if there was a builtin command being run, will return 1 if built in ran 0 if not
             if(check_builtin(argCount, argsCMD) == 1){
                 continue;
+            }
+            // check to see if it is a piped command
+            for(int i = 0; i > argCount; i++){
+                char* signPipe = strchr(argsCMD[i], '|');
+                if(signPipe != NULL){
+                    executePipe(argsCMD, argCount);
+                    addCmdHist(argsCMD, argCount);
+                    continue;
+                }
             }
             // Execute the command
             pid_t pid = fork();
