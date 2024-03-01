@@ -1,3 +1,5 @@
+#include "types.h"
+
 // Flags for wmap
 #define MAP_PRIVATE 0x0001
 #define MAP_SHARED 0x0002
@@ -13,9 +15,9 @@
 // for `getpgdirinfo`
 #define MAX_UPAGE_INFO 32
 struct pgdirinfo {
-    int n_upages;           // the number of allocated physical pages in the process's user address space
-    int va[MAX_UPAGE_INFO]; // the virtual addresses of the allocated physical pages in the process's user address space
-    int pa[MAX_UPAGE_INFO]; // the physical addresses of the allocated physical pages in the process's user address space
+    uint n_upages;           // the number of allocated physical pages in the process's user address space
+    uint va[MAX_UPAGE_INFO]; // the virtual addresses of the allocated physical pages in the process's user address space
+    uint pa[MAX_UPAGE_INFO]; // the physical addresses of the allocated physical pages in the process's user address space
 };
 
 // for `getwmapinfo`
