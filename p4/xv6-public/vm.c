@@ -6,6 +6,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "elf.h"
+#include "wmap.h"
 
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
@@ -385,10 +386,29 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
-
+int sys_wmap() { // try to implement example, kalloc can return a pointer to a physical page
+  int addr;
+  int length;
+  int flags;
+  int fd;
+  if (argint(0, &addr) != 0 || argint(1, &length) != 0 || argint(2, &flags) != 0 || argint(3, &fd) != 0) {
+    return FAILED;
+  }
+  struct proc *p = myproc();
+  // int numPages = (length % 4096) + 1;
+  char *mem = kalloc();
+  mappages(p->pgdir, (void *)addr, 4096, V2P(mem), PTE_W | PTE_U);
+  return 22;
+}
+int sys_wunmap() {
+  return 23;
+}
+int sys_wremap() {
+  return 24;
+}
+int sys_getpgdirinfo() {
+  return 25;
+}
+int sys_wmapinfo() {
+  return 26;
+}
