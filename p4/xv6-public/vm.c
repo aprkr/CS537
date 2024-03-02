@@ -397,10 +397,19 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   struct proc *p = myproc();
   // int numPages = (length % 4096) + 1;
   char *mem = kalloc();
-  return mappages(p->pgdir, (void *)addr, 4096, V2P(mem), PTE_W | PTE_U);
+  return mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
 }
 int sys_wunmap() {
-  return 23;
+  int addr;
+  if (argint(0, &addr) != 0) {
+    return FAILED;
+  }
+  struct proc *p = myproc();
+  pte_t *pte = walkpgdir(p->pgdir, (void *)addr, 0);
+  int physical_address = PTE_ADDR(*pte);
+  kfree(P2V(physical_address));
+  *pte = 0;
+  return SUCCESS;
 }
 int sys_wremap() {
   return 24;
