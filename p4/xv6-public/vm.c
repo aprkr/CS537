@@ -397,8 +397,7 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   struct proc *p = myproc();
   // int numPages = (length % 4096) + 1;
   char *mem = kalloc();
-  mappages(p->pgdir, (void *)addr, 4096, V2P(mem), PTE_W | PTE_U);
-  return 22;
+  return mappages(p->pgdir, (void *)addr, 4096, V2P(mem), PTE_W | PTE_U);
 }
 int sys_wunmap() {
   return 23;
