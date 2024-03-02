@@ -424,7 +424,7 @@ int sys_wremap() {
 int sys_getpgdirinfo() {
   return 25;
 }
-int sys_wmapinfo() {
+int sys_getwmapinfo() {
   struct wmapinfo *wminfo;
   argptr(0, (char **)&wminfo, sizeof(struct wmapinfo));
   struct proc *p = myproc();
