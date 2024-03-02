@@ -397,9 +397,16 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   struct proc *p = myproc();
   // int numPages = (length % 4096) + 1;
   char *mem = kalloc();
+  struct mmap *newmap = p->mmaps[p->num_mmaps];
+  newmap->addr = addr;
+  newmap->size = length;
+  newmap->fd=fd;
+  newmap->numpages = 1; // TODO
+  p->num_mmaps++;
+  
   return mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
 }
-int sys_wunmap() {
+int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
   int addr;
   if (argint(0, &addr) != 0) {
     return FAILED;
@@ -418,5 +425,14 @@ int sys_getpgdirinfo() {
   return 25;
 }
 int sys_wmapinfo() {
-  return 26;
+  struct wmapinfo *wminfo;
+  argptr(0, (char **)&wminfo, sizeof(struct wmapinfo));
+  struct proc *p = myproc();
+  wminfo->total_mmaps = p->num_mmaps;
+  for (int i = 0; i < p->num_mmaps; i++) {
+    wminfo->addr[i] = p->mmaps[i]->addr;
+    wminfo->length[i] = p->mmaps[i]->size;
+    wminfo->n_loaded_pages[i] = p->mmaps[i]->numpages;
+  }
+  return SUCCESS;
 }
