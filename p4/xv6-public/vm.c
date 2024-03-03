@@ -422,7 +422,38 @@ int sys_wremap() {
   return 24;
 }
 int sys_getpgdirinfo() {
-  return 25;
+  struct pgdirinfo *pdinfo;
+  argptr(0, (char **)&pdinfo, sizeof(struct pgdirinfo));
+  pdinfo->n_upages = 0;
+  struct proc *p = myproc();
+  pte_t *pte;
+  uint a = 0;
+  for(int i = 0; a < KERNBASE; a += PGSIZE){
+    pte = walkpgdir(p->pgdir, (char*)a, 0);
+    if(!pte)
+      a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
+    else if((*pte & PTE_U) != 0){
+      uint pa = PTE_ADDR(*pte);
+      pdinfo->n_upages = pdinfo->n_upages + 1;
+      pdinfo->va[i] = a;
+      pdinfo->pa[i] = pa;
+    }
+    i++;
+  }
+  // for (int i = 0; i < p->num_mmaps; i++) {
+  //   if (p->mmaps[i]->allocated != 0) { // check if mmap has been allocated
+  //     for (int j = 0; j < p->mmaps[i]->numpages; j++) { // iterate over each iterated allocated page for the current mmap
+  //       uint virtAddr = p->mmaps[i]->addr + (PGSIZE * j);
+  //       pte_t *pte = walkpgdir(p->pgdir, (void *)virtAddr, 0); // get pte for current virtual address
+  //       if ((*pte & PTE_U) != 0) { // only care pages with PTE_U set
+  //         pdinfo->n_upages += 1;
+  //         pdinfo->va[i + j] = virtAddr;
+  //         pdinfo->pa[i + j] = PTE_ADDR(*pte);
+  //       }
+  //     }
+  //   }
+  // }
+  return SUCCESS;
 }
 int sys_getwmapinfo() {
   struct wmapinfo *wminfo;

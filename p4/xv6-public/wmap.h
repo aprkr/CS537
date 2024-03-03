@@ -1,3 +1,5 @@
+#ifndef WMAP
+#define WMAP
 #include "types.h"
 
 #define MAX_MMAPS 16
@@ -36,4 +38,6 @@ struct mmap {
     uint size;
     int fd;
     int numpages;
+    int allocated;
 };
+#endif
