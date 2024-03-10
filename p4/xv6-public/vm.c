@@ -387,6 +387,16 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
+int checkOverlap(struct proc *p, uint addr, int numPages) {
+  for (int i = 0; i < p->num_mmaps; i++) {
+    if ((addr >= p->mmaps[i].addr && addr < p->mmaps[i].addr + p->mmaps[i].numpages * PGSIZE) || 
+          (addr + numPages * PGSIZE <= p->mmaps[i].addr + p->mmaps[i].numpages * PGSIZE && addr + numPages * PGSIZE > p->mmaps[i].addr)) {
+      return FAILED;
+    }
+  }
+  return SUCCESS;
+}
+
 int sys_wmap() { // try to implement example, kalloc can return a pointer to a physical page
   int addr;
   int length;
@@ -440,7 +450,19 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
 
     default: ;// catch whatever combo of flags are no good
 
-  } 
+  }
+  // check for overlaps
+  if ((flags & MAP_FIXED) == 0) {
+    for (uint curAddr = USERMEM; curAddr < KERNBASE; curAddr += PGSIZE) {
+      if (checkOverlap(p, curAddr, numPages) == SUCCESS) {
+        addr = curAddr;
+        break;
+      }
+    }
+  } else if (checkOverlap(p, addr, numPages) == FAILED) {
+    return FAILED;
+  }
+
   p->mmaps[p->num_mmaps].addr = addr;
   p->mmaps[p->num_mmaps].size = length;
   p->mmaps[p->num_mmaps].fd = fd;
@@ -448,12 +470,13 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   p->num_mmaps++;
   return addr;
 }
+
 int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
   int addr;
   if (argint(0, &addr) != 0) {
     return FAILED;
   }
-  if (addr < 0x60000000 || addr > KERNBASE) {
+  if (addr < USERMEM || addr > KERNBASE) {
     return FAILED;
   }
   struct proc *p = myproc();
