@@ -8,6 +8,7 @@
 #include "traps.h"
 #include "spinlock.h"
 #include "wmap.h"
+#include "vm.h"
 
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
@@ -78,23 +79,25 @@ trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
-  case T_PGFLT:
+  case T_PGFLT: ;// T_PGFLT = 14
+    int handled = 0;
+    uint addr = PGROUNDDOWN(rcr2());
     struct proc *p = myproc();
     for (int i = 0; i < p->num_mmaps; i++) {
-      // TODO: Need to add struct to keep track of memory alloc's
-      if(){
-        uint addr = p->mmaps[i]->addr;
-        // map each page, mappages will only map one page at a time so we need to incremement the addresss 0x1000 each time
-        for(int j = 0; j < p->mmaps[i]->numpages; j++){
+      if (addr >= p->mmaps[i]->addr && addr < (p->mmaps[i]->addr + (p->mmaps[i]->numpages * PGSIZE))) {
+        for (int j = 0; j < p->mmaps[i]->numpages; j++) {
           char *mem = kalloc();
-          mappages(myproc()->pgdir, (void *), PGSIZE, V2P(mem), PTE_W | PTE_U);
-          addr += 0x1000;
+          mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
         }
+        break;
       }
     }
-    cprintf("Segmentation Fault\n");
-    myproc()->killed = 1;
-
+    if (handled == 0) {
+      cprintf("Segmentation Fault\n");
+      myproc()->killed = 1;
+    }
+    break;
+        
   //PAGEBREAK: 13
   default:
     if(myproc() == 0 || (tf->cs&3) == 0){
