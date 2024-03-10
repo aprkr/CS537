@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "elf.h"
 #include "wmap.h"
+#include <math.h>
 
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
@@ -395,16 +396,56 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
     return FAILED;
   }
   struct proc *p = myproc();
-  // int numPages = (length % 4096) + 1;
-  char *mem = kalloc();
+  // essentially just rounds up the int if there is a fractional part
+  int numPages = length / 4096;
+  if((length % 4096) != 0){
+      numPages++;
+  }
+  //TODO: filter out combo of flags we do not need, and defualt case will catch
+  switch(flags){
+    case 0: // NO FLAGS
+
+    case 1: // MAP_PRIVATE
+
+    case 2: // MAP_SHARED
+
+    case 3: // MAP_PRIVATE, MAP_SHARED
+
+    case 4: // MAP_ANONYMOUS
+
+    case 5: // MAP_PRIVATE, MAP_ANONYMOUS
+
+    case 6: // MAP_SHARED, MAP_ANONYMOUS
+
+    case 7: // MAP_PRIVATE, MAP_SHARED, MAP_ANONYMOUS
+
+    case 8: // MAP_FIXED
+
+    case 9: // MAP_PRIVATE, MAP_FIXED
+
+    case 10: // MAP_SHARED, MAP_FIXED
+
+    case 11: // MAP_FIXED, MAP_SHARED, MAP_FIXED
+
+    case 12: // MAP_ANONYMOUS, MAP_FIXED
+
+    case 13: // MAP_PRIVATE, MAP_ANONYMOUS, MAP_FIXED
+
+    case 14: // MAP_SHARED, MAP_ANONYMOUS, MAP_FIXED
+
+    case 15: // MAP_PRIVATE, MAP_SHARED, MAP_ANONYMOUS, MAP_FIXED
+
+    default: // catch whatever combo of flags are no good
+
+  } 
   struct mmap *newmap = p->mmaps[p->num_mmaps];
   newmap->addr = addr;
   newmap->size = length;
   newmap->fd=fd;
-  newmap->numpages = 1; // TODO
+  newmap->numpages;
   p->num_mmaps++;
   
-  return mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
+  return ;
 }
 int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
   int addr;
