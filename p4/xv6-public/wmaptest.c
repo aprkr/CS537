@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
     
     struct wmapinfo idk;
     idk.total_mmaps = -1;
-    wmapinfo(&idk);
+    getwmapinfo(&idk);
     printf(1, "%d\n%d\n", idk.addr[0], idk.total_mmaps);
     // wmapinfo(idk);
     // printf(1, "%d\n", idk[0]->addr);
