@@ -7,7 +7,7 @@
 #include "proc.h"
 #include "elf.h"
 #include "wmap.h"
-#include <math.h>
+#include "vm.h"
 
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
@@ -59,7 +59,7 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
-static int
+int
 mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 {
   char *a, *last;
@@ -395,6 +395,9 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   if (argint(0, &addr) != 0 || argint(1, &length) != 0 || argint(2, &flags) != 0 || argint(3, &fd) != 0) {
     return FAILED;
   }
+  if (addr < 0x60000000 || addr > KERNBASE) {
+    return FAILED;
+  }
   struct proc *p = myproc();
   // essentially just rounds up the int if there is a fractional part
   int numPages = length / 4096;
@@ -402,7 +405,7 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
       numPages++;
   }
   //TODO: filter out combo of flags we do not need, and defualt case will catch
-  switch(flags){
+  switch(flags) {
     case 0: // NO FLAGS
 
     case 1: // MAP_PRIVATE
@@ -435,21 +438,22 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
 
     case 15: // MAP_PRIVATE, MAP_SHARED, MAP_ANONYMOUS, MAP_FIXED
 
-    default: // catch whatever combo of flags are no good
+    default: ;// catch whatever combo of flags are no good
 
   } 
-  struct mmap *newmap = p->mmaps[p->num_mmaps];
-  newmap->addr = addr;
-  newmap->size = length;
-  newmap->fd=fd;
-  newmap->numpages;
+  p->mmaps[p->num_mmaps].addr = addr;
+  p->mmaps[p->num_mmaps].size = length;
+  p->mmaps[p->num_mmaps].fd = fd;
+  p->mmaps[p->num_mmaps].numpages = numPages;
   p->num_mmaps++;
-  
-  return ;
+  return addr;
 }
 int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
   int addr;
   if (argint(0, &addr) != 0) {
+    return FAILED;
+  }
+  if (addr < 0x60000000 || addr > KERNBASE) {
     return FAILED;
   }
   struct proc *p = myproc();
@@ -502,9 +506,9 @@ int sys_getwmapinfo() {
   struct proc *p = myproc();
   wminfo->total_mmaps = p->num_mmaps;
   for (int i = 0; i < p->num_mmaps; i++) {
-    wminfo->addr[i] = p->mmaps[i]->addr;
-    wminfo->length[i] = p->mmaps[i]->size;
-    wminfo->n_loaded_pages[i] = p->mmaps[i]->numpages;
+    wminfo->addr[i] = p->mmaps[i].addr;
+    wminfo->length[i] = p->mmaps[i].size;
+    wminfo->n_loaded_pages[i] = p->mmaps[i].numpages;
   }
   return SUCCESS;
 }

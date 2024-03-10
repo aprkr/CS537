@@ -84,8 +84,8 @@ trap(struct trapframe *tf)
     uint addr = PGROUNDDOWN(rcr2());
     struct proc *p = myproc();
     for (int i = 0; i < p->num_mmaps; i++) {
-      if (addr >= p->mmaps[i]->addr && addr < (p->mmaps[i]->addr + (p->mmaps[i]->numpages * PGSIZE))) {
-        for (int j = 0; j < p->mmaps[i]->numpages; j++) {
+      if (addr >= p->mmaps[i].addr && addr < (p->mmaps[i].addr + (p->mmaps[i].numpages * PGSIZE))) {
+        for (int j = 0; j < p->mmaps[i].numpages; j++) {
           char *mem = kalloc();
           mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
         }

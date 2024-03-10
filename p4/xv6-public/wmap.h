@@ -33,11 +33,11 @@ struct wmapinfo {
     int n_loaded_pages[MAX_WMMAP_INFO]; // Number of pages physically loaded into memory
 };
 
-struct mmap {
-    uint addr;
-    uint size;
-    int fd;
-    int numpages;
-    int allocated;
-};
+// struct mmap {
+//     uint addr;
+//     uint size;
+//     int fd;
+//     int numpages;
+//     int allocated;
+// };
 #endif
