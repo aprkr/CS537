@@ -492,15 +492,13 @@ int sys_getpgdirinfo() {
   uint a = 0;
   for(int i = 0; a < KERNBASE; a += PGSIZE){
     pte = walkpgdir(p->pgdir, (char*)a, 0);
-    if(!pte)
-      a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
-    else if((*pte & PTE_U) != 0){
+    if(pte && ((*pte & PTE_U) != 0)){
       uint pa = PTE_ADDR(*pte);
       pdinfo->n_upages = pdinfo->n_upages + 1;
       pdinfo->va[i] = a;
       pdinfo->pa[i] = pa;
+      i++;
     }
-    i++;
   }
   // for (int i = 0; i < p->num_mmaps; i++) {
   //   if (p->mmaps[i]->allocated != 0) { // check if mmap has been allocated
