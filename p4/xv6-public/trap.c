@@ -90,13 +90,17 @@ trap(struct trapframe *tf)
   // tf->err, cpuid(), tf->eip, addr);
     for (int i = 0; i < p->num_mmaps; i++) {
       if (addr >= p->mmaps[i].addr && addr < (p->mmaps[i].addr + p->mmaps[i].size)) {
-        // for (int j = 0; j < p->mmaps[i].numpages; j++) {
-          char *mem = kalloc();
-          mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
-          handled = 1;
-          p->mmaps[i].allocated += 1;
+        char *mem = kalloc();
+        mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
+        handled = 1;
+        p->mmaps[i].allocated += 1;
+        if (p->mmaps[i].fd == -1) {
           memset((void *)addr, 0, PGSIZE);
-        // }
+        } else {
+          struct file *f = p->ofile[p->mmaps[i].fd];
+          filesetoff(f, (addr - p->mmaps[i].addr));
+          fileread(f, mem, PGSIZE);
+        }
         break;
       }
     }

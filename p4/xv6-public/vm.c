@@ -433,10 +433,15 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   }
   p->mmaps[p->num_mmaps].addr = addr;
   p->mmaps[p->num_mmaps].size = length;
-  p->mmaps[p->num_mmaps].fd = fd;
   p->mmaps[p->num_mmaps].shared = flags & MAP_SHARED;
   p->mmaps[p->num_mmaps].numpages = numPages;
   p->mmaps[p->num_mmaps].allocated = 0;
+  if ((flags & MAP_ANONYMOUS) == 0) {
+    filedup(p->ofile[fd]);
+    p->mmaps[p->num_mmaps].fd = fd;
+  } else {
+    p->mmaps[p->num_mmaps].fd = -1;
+  }
   p->num_mmaps++;
   return addr;
 }

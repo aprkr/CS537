@@ -112,6 +112,14 @@ fileread(struct file *f, char *addr, int n)
   panic("fileread");
 }
 
+void
+filesetoff(struct file *f, uint off)
+{
+  ilock(f->ip);
+  f->off = off;
+  iunlock(f->ip);
+}
+
 //PAGEBREAK!
 // Write to file f.
 int
