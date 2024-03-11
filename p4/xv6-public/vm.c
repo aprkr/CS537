@@ -464,11 +464,23 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
         kfree(P2V(physical_address));
         *pte = 0;
       }
+      // need to do some array cleanup
+      if(i != p->num_mmaps){
+        for(int j = i; j < p->num_mmaps; j++){
+          p->mmaps[j] = p->mmaps[j + 1];
+        }
+      }
+      p->num_mmaps--;
     }
   }
   return SUCCESS;
 }
 int sys_wremap() {
+  uint oldaddr;
+  int oldsize;
+  int newsize;
+  int flags;
+  
   return 24;
 }
 int sys_getpgdirinfo() {
