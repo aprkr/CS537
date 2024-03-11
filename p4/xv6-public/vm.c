@@ -436,6 +436,7 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   p->mmaps[p->num_mmaps].fd = fd;
   p->mmaps[p->num_mmaps].shared = flags & MAP_SHARED;
   p->mmaps[p->num_mmaps].numpages = numPages;
+  p->mmaps[p->num_mmaps].allocated = 0;
   p->num_mmaps++;
   return addr;
 }
@@ -523,7 +524,7 @@ int sys_getwmapinfo() {
   for (int i = 0; i < p->num_mmaps; i++) {
     wminfo->addr[i] = p->mmaps[i].addr;
     wminfo->length[i] = p->mmaps[i].size;
-    wminfo->n_loaded_pages[i] = p->mmaps[i].numpages;
+    wminfo->n_loaded_pages[i] = p->mmaps[i].allocated;
   }
   return SUCCESS;
 }

@@ -94,6 +94,8 @@ trap(struct trapframe *tf)
           char *mem = kalloc();
           mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
           handled = 1;
+          p->mmaps[i].allocated += 1;
+          memset((void *)addr, 0, PGSIZE);
         // }
         break;
       }
