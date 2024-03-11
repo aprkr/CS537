@@ -415,43 +415,6 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   if((length % 4096) != 0){
       numPages++;
   }
-  //TODO: filter out combo of flags we do not need, and defualt case will catch
-  switch(flags) {
-    case 0: // NO FLAGS
-
-    case 1: // MAP_PRIVATE
-
-    case 2: // MAP_SHARED
-
-    case 3: // MAP_PRIVATE, MAP_SHARED
-
-    case 4: // MAP_ANONYMOUS
-
-    case 5: // MAP_PRIVATE, MAP_ANONYMOUS
-
-    case 6: // MAP_SHARED, MAP_ANONYMOUS
-
-    case 7: // MAP_PRIVATE, MAP_SHARED, MAP_ANONYMOUS
-
-    case 8: // MAP_FIXED
-
-    case 9: // MAP_PRIVATE, MAP_FIXED
-
-    case 10: // MAP_SHARED, MAP_FIXED
-
-    case 11: // MAP_FIXED, MAP_SHARED, MAP_FIXED
-
-    case 12: // MAP_ANONYMOUS, MAP_FIXED
-
-    case 13: // MAP_PRIVATE, MAP_ANONYMOUS, MAP_FIXED
-
-    case 14: // MAP_SHARED, MAP_ANONYMOUS, MAP_FIXED
-
-    case 15: // MAP_PRIVATE, MAP_SHARED, MAP_ANONYMOUS, MAP_FIXED
-
-    default: ;// catch whatever combo of flags are no good
-
-  }
   // check for overlaps
   if ((flags & MAP_FIXED) == 0) {
     for (uint curAddr = USERMEM; curAddr < KERNBASE; curAddr += PGSIZE) {
@@ -468,10 +431,10 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
       return FAILED;
     }
   }
-
   p->mmaps[p->num_mmaps].addr = addr;
   p->mmaps[p->num_mmaps].size = length;
   p->mmaps[p->num_mmaps].fd = fd;
+  p->mmaps[p->num_mmaps].shared = flags & MAP_SHARED;
   p->mmaps[p->num_mmaps].numpages = numPages;
   p->num_mmaps++;
   return addr;
@@ -479,17 +442,30 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
 
 int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
   int addr;
+  struct proc *p = myproc();
   if (argint(0, &addr) != 0) {
     return FAILED;
   }
-  if (addr < USERMEM || addr > KERNBASE) {
+  // address must be within bounds as well as page aligned
+  if ((addr < USERMEM || addr > KERNBASE) || ((addr % PGSIZE) != 0)) {
     return FAILED;
   }
-  struct proc *p = myproc();
-  pte_t *pte = walkpgdir(p->pgdir, (void *)addr, 0);
-  int physical_address = PTE_ADDR(*pte);
-  kfree(P2V(physical_address));
-  *pte = 0;
+  // iterate all allocations to check if allocation exsists
+  for(int i = 0; i < p->num_mmaps; i++){
+    if(p->mmaps[i].addr == addr){
+      // if MAP_SHARED set write memory contents back to file
+      if(p->mmaps[i].shared){
+        filewrite(p->mmaps[i].fd, addr, p->mmaps[i].size);
+      }
+      // iterates over each page in the allocation and frees it
+      for (uint curAddr = addr; curAddr < (addr + (PGSIZE * p->num_mmaps)); curAddr += PGSIZE) {
+        pte_t *pte = walkpgdir(p->pgdir, (void *)addr, 0);
+        int physical_address = PTE_ADDR(*pte);
+        kfree(P2V(physical_address));
+        *pte = 0;
+      }
+    }
+  }
   return SUCCESS;
 }
 int sys_wremap() {

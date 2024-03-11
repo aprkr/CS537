@@ -38,6 +38,7 @@ struct mmap {
     uint addr;
     uint size;
     int fd;
+    int shared;
     int numpages;
     int allocated;
 };
