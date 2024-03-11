@@ -83,12 +83,18 @@ trap(struct trapframe *tf)
     int handled = 0;
     uint addr = PGROUNDDOWN(rcr2());
     struct proc *p = myproc();
+  //   cprintf("============in pagefault_handler============\n");
+  // cprintf("pid %d %s: trap %d err %d on cpu %d "
+  // "eip 0x%x addr 0x%x\n",
+  // p->pid, p->name, tf->trapno,
+  // tf->err, cpuid(), tf->eip, addr);
     for (int i = 0; i < p->num_mmaps; i++) {
-      if (addr >= p->mmaps[i].addr && addr < (p->mmaps[i].addr + (p->mmaps[i].numpages * PGSIZE))) {
-        for (int j = 0; j < p->mmaps[i].numpages; j++) {
+      if (addr >= p->mmaps[i].addr && addr < (p->mmaps[i].addr + p->mmaps[i].size)) {
+        // for (int j = 0; j < p->mmaps[i].numpages; j++) {
           char *mem = kalloc();
           mappages(p->pgdir, (void *)addr, PGSIZE, V2P(mem), PTE_W | PTE_U);
-        }
+          handled = 1;
+        // }
         break;
       }
     }
