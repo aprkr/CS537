@@ -401,14 +401,7 @@ int checkOverlap(struct proc *p, uint addr, int numPages) {
   return SUCCESS;
 }
 
-int sys_wmap() { // try to implement example, kalloc can return a pointer to a physical page
-  uint addr;
-  int length;
-  int flags;
-  int fd;
-  if (argint(0, (int*)&addr) != 0 || argint(1, &length) != 0 || argint(2, &flags) != 0 || argint(3, &fd) != 0) {
-    return FAILED;
-  }
+int wmap(uint addr, int length, int flags, int fd){
   struct proc *p = myproc();
   // essentially just rounds up the int if there is a fractional part
   int numPages = length / 4096;
@@ -437,6 +430,7 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   p->mmaps[p->num_mmaps].numpages = numPages;
   p->mmaps[p->num_mmaps].allocated = 0;
   p->mmaps[p->num_mmaps].refs = 1;
+  p->mmaps[p->num_mmaps].flags = flags;
   if ((flags & MAP_ANONYMOUS) == 0) {
     filedup(p->ofile[fd]);
     p->mmaps[p->num_mmaps].fd = fd;
@@ -445,6 +439,17 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   }
   p->num_mmaps++;
   return addr;
+}
+
+int sys_wmap() { // try to implement example, kalloc can return a pointer to a physical page
+  uint addr;
+  int length;
+  int flags;
+  int fd;
+  if (argint(0, (int*)&addr) != 0 || argint(1, &length) != 0 || argint(2, &flags) != 0 || argint(3, &fd) != 0) {
+    return FAILED;
+  }
+  return wmap(addr, length, flags, fd);
 }
 
 int unmap(uint addr) {
@@ -471,6 +476,8 @@ int unmap(uint addr) {
         }
         if (p->mmaps[i].refs == 0) {
           uint physical_address = PTE_ADDR(*pte);
+          cprintf("%x\n", curAddr);
+          cprintf("%x\n", P2V(physical_address));
           kfree(P2V(physical_address));
         }
         *pte = 0;
@@ -515,13 +522,69 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
   return unmap(addr);
 }
 int sys_wremap() {
-  // uint oldaddr;
-  // int oldsize;
-  // int newsize;
-  // int flags;
-  
-  return 24;
+  uint oldaddr;
+  int oldsize;
+  int newsize;
+  uint flags;
+
+  if (argint(0, (int*)&oldaddr) != 0 || argint(1, &oldsize) != 0 || argint(2, &newsize) != 0 || argint(3, (int*)&flags) != 0) {
+    return FAILED;
+  }
+
+  // find the mmap that is associated with this addr
+  struct proc *p = myproc();
+  for(int i = 0; i < p->num_mmaps; i++){
+    if(p->mmaps[i].addr == oldaddr){
+      // essentially just rounds up the int if there is a fractional part
+      int newNumPages = newsize / PGSIZE;
+      if((newsize % PGSIZE) != 0){
+          newNumPages++;
+      }
+      int oldNumPages = oldsize / PGSIZE;
+      if((oldsize % PGSIZE) != 0){
+      	oldNumPages++;
+      }
+      // regardless of flags set we are going to check and see if we can remap in the same place with the new size
+      if ((checkOverlap(p, oldaddr + oldsize, newNumPages) != FAILED)) {
+        p->mmaps[i].addr = oldaddr;
+        p->mmaps[i].size = newsize;
+        p->mmaps[i].numpages = newNumPages;
+        p->mmaps[i].refs += 1;
+        // need to dealloc pages if we shrunk
+        if((newNumPages - oldNumPages) < 0){
+          for (uint curAddr = (oldaddr + newsize); curAddr <= (oldaddr + oldsize); curAddr += PGSIZE) {
+            pte_t *pte = walkpgdir(p->pgdir, (void *)curAddr, 0);
+            if (pte == 0) { // Don't free a page that wasn't allocated
+              continue;
+            }
+            if (p->mmaps[i].refs == 0) {
+              uint physical_address = PTE_ADDR(*pte);
+              kfree(P2V(physical_address));
+            }
+            // Invalidate TLB entry for the virtual address
+            *pte = 0;
+            }
+        }
+        return oldaddr;
+      }
+      // map can be moved
+      if(flags & MREMAP_MAYMOVE){
+        for (uint curAddr = USERMEM; curAddr < KERNBASE; curAddr += PGSIZE) {
+          if (checkOverlap(p, curAddr, newNumPages) == SUCCESS) {
+            // update mmap
+            wmap(curAddr, newsize, p->mmaps[i].flags | MAP_FIXED, p->mmaps->fd);
+            p->mmaps[p->num_mmaps - 1].refs += 1;
+            memmove((void *) curAddr, (void *) oldaddr, oldsize < newsize ? oldsize : newsize);
+            unmap(oldaddr);
+            return p->mmaps[p->num_mmaps - 1].addr;
+          }
+        }     
+      }
+    }
+  }
+  return FAILED;
 }
+  // did not find any mappings that match so we fail out
 int sys_getpgdirinfo() {
   struct pgdirinfo *pdinfo;
   argptr(0, (char **)&pdinfo, sizeof(struct pgdirinfo));
