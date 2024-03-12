@@ -476,8 +476,6 @@ int unmap(uint addr) {
         }
         if (p->mmaps[i].refs == 0) {
           uint physical_address = PTE_ADDR(*pte);
-          cprintf("%x\n", curAddr);
-          cprintf("%x\n", P2V(physical_address));
           kfree(P2V(physical_address));
         }
         *pte = 0;
@@ -538,7 +536,7 @@ int sys_wremap() {
       // essentially just rounds up the int if there is a fractional part
       int newNumPages = newsize / PGSIZE;
       if((newsize % PGSIZE) != 0){
-          newNumPages++;
+        newNumPages++;
       }
       int oldNumPages = oldsize / PGSIZE;
       if((oldsize % PGSIZE) != 0){
