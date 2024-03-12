@@ -41,6 +41,7 @@ struct mmap {
     int shared;
     int numpages;
     int allocated;
+    int refs;
 };
 
 // Per-process state

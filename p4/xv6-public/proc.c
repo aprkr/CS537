@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "vm.h"
 
 struct {
   struct spinlock lock;
@@ -199,6 +200,25 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  for (int i = 0; i < curproc->num_mmaps; i++) {
+    np->mmaps[i] = curproc->mmaps[i];
+    np->mmaps[i].refs++;
+    for (int j = 0; j < curproc->mmaps[i].numpages; j++) {
+      pte_t *pte = walkpgdir(curproc->pgdir, (char*)curproc->mmaps[i].addr + j * PGSIZE, 0);
+      if (!pte) {
+        continue;
+      }
+      char *mem;
+      if (curproc->mmaps[i].shared) {
+        mem = (char *)P2V(PTE_ADDR(*pte));
+      } else {
+        mem = kalloc();
+        memmove(mem, (char *)P2V(PTE_ADDR(*pte)), PGSIZE);
+      }
+      mappages(np->pgdir, (void *)(curproc->mmaps[i].addr + j * PGSIZE), PGSIZE, V2P(mem), PTE_W | PTE_U);
+    }
+  }
+  np->num_mmaps = curproc->num_mmaps;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -234,6 +254,7 @@ exit(void)
   if(curproc == initproc)
     panic("init exiting");
 
+  removemaps(curproc);
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){

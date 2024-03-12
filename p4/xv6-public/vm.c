@@ -34,7 +34,7 @@ seginit(void)
 // Return the address of the PTE in page table pgdir
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page table pages.
-static pte_t *
+pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int alloc)
 {
   pde_t *pde;
@@ -436,6 +436,7 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   p->mmaps[p->num_mmaps].shared = flags & MAP_SHARED;
   p->mmaps[p->num_mmaps].numpages = numPages;
   p->mmaps[p->num_mmaps].allocated = 0;
+  p->mmaps[p->num_mmaps].refs = 1;
   if ((flags & MAP_ANONYMOUS) == 0) {
     filedup(p->ofile[fd]);
     p->mmaps[p->num_mmaps].fd = fd;
@@ -446,21 +447,18 @@ int sys_wmap() { // try to implement example, kalloc can return a pointer to a p
   return addr;
 }
 
-int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
-  int addr;
-  struct proc *p = myproc();
-  if (argint(0, &addr) != 0) {
-    return FAILED;
-  }
+int unmap(uint addr) {
   // address must be within bounds as well as page aligned
   if ((addr < USERMEM || addr > KERNBASE) || ((addr % PGSIZE) != 0)) {
     return FAILED;
   }
+  struct proc *p = myproc();
   // iterate all allocations to check if allocation exsists
   for(int i = 0; i < p->num_mmaps; i++){
     if(p->mmaps[i].addr == addr){
+      p->mmaps[i].refs--;
       // if MAP_SHARED set write memory contents back to file
-      if (p->mmaps[i].shared && p->mmaps[i].fd != -1) {
+      if (p->mmaps[i].shared && p->mmaps[i].fd != -1 && p->mmaps[i].refs == 0) {
         filesetoff(p->ofile[p->mmaps[i].fd], 0);
         filewrite(p->ofile[p->mmaps[i].fd], (char *)addr, p->mmaps[i].size);
         fileclose(p->ofile[p->mmaps[i].fd]);
@@ -471,8 +469,10 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
         if (pte == 0) { // Don't free a page that wasn't allocated
           continue;
         }
-        uint physical_address = PTE_ADDR(*pte);
-        kfree(P2V(physical_address));
+        if (p->mmaps[i].refs == 0) {
+          uint physical_address = PTE_ADDR(*pte);
+          kfree(P2V(physical_address));
+        }
         *pte = 0;
       }
       // need to do some array cleanup
@@ -486,6 +486,33 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
     }
   }
   return SUCCESS;
+}
+
+void removemaps(struct proc *p) {
+  for (int i = 0; i < p->num_mmaps; i++) {
+    p->mmaps[i].refs--;
+    // if (p->mmaps[i].refs != 0) {
+    //   continue;
+    // }
+    for (int j = 0; j < p->mmaps[i].numpages; j++) {
+      pte_t *pte = walkpgdir(p->pgdir, (void *)(p->mmaps[i].addr + j * PGSIZE), 0);
+      if (pte == 0) {
+        continue;
+      }
+      *pte &= ~PTE_P;
+    }
+    
+    // uint mem = (char *)P2V(PTE_ADDR(*pte));
+    // unmap(p->mmaps[i].addr);
+  }
+}
+
+int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, remove mmaps from proc
+  int addr;
+  if (argint(0, &addr) != 0) {
+    return FAILED;
+  }
+  return unmap(addr);
 }
 int sys_wremap() {
   // uint oldaddr;
