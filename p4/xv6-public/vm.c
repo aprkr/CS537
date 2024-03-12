@@ -460,13 +460,18 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
   for(int i = 0; i < p->num_mmaps; i++){
     if(p->mmaps[i].addr == addr){
       // if MAP_SHARED set write memory contents back to file
-      if(p->mmaps[i].shared){
-        filewrite(p->mmaps[i].fd, addr, p->mmaps[i].size);
+      if (p->mmaps[i].shared && p->mmaps[i].fd != -1) {
+        filesetoff(p->ofile[p->mmaps[i].fd], 0);
+        filewrite(p->ofile[p->mmaps[i].fd], (char *)addr, p->mmaps[i].size);
+        fileclose(p->ofile[p->mmaps[i].fd]);
       }
       // iterates over each page in the allocation and frees it
-      for (uint curAddr = addr; curAddr < (addr + (PGSIZE * p->num_mmaps)); curAddr += PGSIZE) {
-        pte_t *pte = walkpgdir(p->pgdir, (void *)addr, 0);
-        int physical_address = PTE_ADDR(*pte);
+      for (uint curAddr = addr; curAddr < (addr + (PGSIZE * p->mmaps[i].numpages)); curAddr += PGSIZE) {
+        pte_t *pte = walkpgdir(p->pgdir, (void *)curAddr, 0);
+        if (pte == 0) { // Don't free a page that wasn't allocated
+          continue;
+        }
+        uint physical_address = PTE_ADDR(*pte);
         kfree(P2V(physical_address));
         *pte = 0;
       }
@@ -477,15 +482,16 @@ int sys_wunmap() { // get mmap for addr, free each page and go to next of mmap, 
         }
       }
       p->num_mmaps--;
+      break;
     }
   }
   return SUCCESS;
 }
 int sys_wremap() {
-  uint oldaddr;
-  int oldsize;
-  int newsize;
-  int flags;
+  // uint oldaddr;
+  // int oldsize;
+  // int newsize;
+  // int flags;
   
   return 24;
 }
