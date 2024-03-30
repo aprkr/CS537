@@ -405,7 +405,24 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    int topPriority = 21;
+    struct proc *procs[NPROC];
+    int procIndex = 0;
+    int numProcs = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if (p->priority < topPriority) {
+        procs[0] = p;
+        topPriority = p->priority;
+        procIndex = 1;
+        numProcs = 1;
+      } else if (p->priority == topPriority) {
+        procs[procIndex] = p;
+        procIndex++;
+        numProcs++;
+      }
+    }
+    for(int i = 0; i < numProcs; i++) {
+      p = procs[i];
       if(p->state != RUNNABLE)
         continue;
 
