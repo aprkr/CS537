@@ -410,6 +410,8 @@ scheduler(void)
     int procIndex = 0;
     int numProcs = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if(p->state != RUNNABLE)
+        continue;
       if (p->priority < topPriority) {
         procs[0] = p;
         topPriority = p->priority;
