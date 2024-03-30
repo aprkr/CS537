@@ -106,10 +106,15 @@ sys_uptime(void)
   return xticks;
 }
 
-void sys_macquire(mutex* m) {
-
+void sys_macquire() {
+  mutex *m;
+  argptr(0, (char **)&m, sizeof(mutex));
+  while(xchg(&m->locked, 1) != 0)
+    ;
 }
 
-void sys_mrelease(mutex* m) {  
-
+void sys_mrelease() {
+  mutex *m;
+  argptr(0, (char **)&m, sizeof(mutex));
+  asm volatile("movl $0, %0" : "+m" (m->locked) : );
 }

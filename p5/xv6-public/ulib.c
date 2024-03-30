@@ -106,5 +106,6 @@ memmove(void *vdst, const void *vsrc, int n)
 }
 
 void minit(mutex *m) {
+  m->locked = 0;
   
 }
