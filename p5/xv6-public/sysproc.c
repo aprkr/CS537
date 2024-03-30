@@ -118,3 +118,7 @@ void sys_mrelease() {
   argptr(0, (char **)&m, sizeof(mutex));
   asm volatile("movl $0, %0" : "+m" (m->locked) : );
 }
+
+int sys_nice() {
+  return 0;
+}
