@@ -120,5 +120,14 @@ void sys_mrelease() {
 }
 
 int sys_nice() {
+  int inc;
+  argint(0, &inc);
+  struct proc *p = myproc();
+  p->priority += inc;
+  if (p->priority > 19) {
+    p->priority = 19;
+  } else if (p->priority < -20) {
+    p->priority = -20;
+  }
   return 0;
 }
