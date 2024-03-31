@@ -113,8 +113,8 @@ void sys_macquire() {
   acquire(&m->lk);
   while (m->locked) {
     if (p->priority < m->requesterPriority) {
-      m->requesterPriority = p->priority;
-      m->p->priority = p->priority;
+      m->requesterPriority = p->priority + 1;
+      m->p->priority = p->priority + 1;
     }
     sleep(m, &m->lk);
   }
@@ -130,6 +130,7 @@ void sys_mrelease() {
   argptr(0, (char **)&m, sizeof(mutex));
   acquire(&m->lk);
   m->locked = 0;
+  m->p->priority = m->holderPriority;
   wakeup(m);
   release(&m->lk);
 }
