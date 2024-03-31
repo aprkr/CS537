@@ -109,14 +109,29 @@ sys_uptime(void)
 void sys_macquire() {
   mutex *m;
   argptr(0, (char **)&m, sizeof(mutex));
-  while(xchg(&m->locked, 1) != 0)
-    ;
+  struct proc *p = myproc();
+  acquire(&m->lk);
+  while (m->locked) {
+    if (p->priority < m->requesterPriority) {
+      m->requesterPriority = p->priority;
+      m->p->priority = p->priority;
+    }
+    sleep(m, &m->lk);
+  }
+  m->locked = 1;
+  m->holderPriority = p->priority;
+  m->requesterPriority = p->priority;
+  m->p = p;
+  release(&m->lk);
 }
 
 void sys_mrelease() {
   mutex *m;
   argptr(0, (char **)&m, sizeof(mutex));
-  asm volatile("movl $0, %0" : "+m" (m->locked) : );
+  acquire(&m->lk);
+  m->locked = 0;
+  wakeup(m);
+  release(&m->lk);
 }
 
 int sys_nice() {
