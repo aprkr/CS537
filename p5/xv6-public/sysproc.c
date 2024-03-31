@@ -113,8 +113,8 @@ void sys_macquire() {
   acquire(&m->lk);
   while (m->locked) {
     if (p->priority < m->requesterPriority) {
-      m->requesterPriority = p->priority + 1;
-      m->p->priority = p->priority + 1;
+      m->requesterPriority = p->priority;
+      m->p->priority = p->priority;
     }
     sleep(m, &m->lk);
   }
