@@ -11,15 +11,20 @@ int table_size;
 int num_threads;
 char *optarg;
 
+key_type *key_array;
+value_type *value_array;
+
 int put(key_type k, value_type v) {
-    printf("server put\n");
+    index_t index = hash_function(k, table_size);
+    value_array[index] = v;
+    key_array[index] = k;
     return 0;
 
 }
 
 int get(key_type k) {
-    printf("server get\n");
-    return 0;
+    index_t index = hash_function(k, table_size);
+    return value_array[index];
 
 }
 
@@ -34,6 +39,8 @@ int main(int argc, char *argv[]) {
 	
 		case 's':
 		table_size = atoi(optarg);
+        key_array = calloc(table_size, sizeof(key_type));
+        value_array = calloc(table_size, sizeof(key_type));
 		break;
 
 		case 'v':
@@ -51,11 +58,10 @@ int main(int argc, char *argv[]) {
     while (1) {
         struct buffer_descriptor bd;
         ring_get(ring, &bd);
-        printf("%d\n",bd.res_off);
         if (bd.req_type == PUT) {
             put(bd.k, bd.v);
         } else {
-            get(bd.k);
+            bd.v = get(bd.k);
         }
         // struct buffer_descriptor *idk = ring + bd.res_off;
         struct buffer_descriptor *result = mem + bd.res_off;
