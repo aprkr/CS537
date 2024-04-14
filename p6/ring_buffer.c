@@ -16,21 +16,25 @@ int init_ring(struct ring *r) {
 // client submits new requests to buffer through this
 void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
     printf("ring submit %d\n",bd->k);
-    int next_index = r->p_head + 1;
-    // struct buffer_descriptor next = r->buffer[r->p_head + 1];
-    if (next_index >= RING_SIZE) {
-        next_index = 0;
-    }
+    while (1) {
+        int p_head = r->p_head;
+        int next_index = p_head + 1;
+        if (next_index >= RING_SIZE) {
+            next_index = 0;
+        }
 
-    if (next_index == r->c_tail) {
-        return; // full
+        if (next_index == r->c_tail) {
+            return; // full
+        }
+        if (!__atomic_compare_exchange(&r->p_head,&p_head,&next_index,false,__ATOMIC_RELAXED,__ATOMIC_RELAXED)) {
+            continue;
+        }
+        memcpy(&r->buffer[p_head], bd, sizeof(struct buffer_descriptor));
+        while (r->p_tail != p_head) {}
+        r->p_tail = r->p_head;
+        break;
     }
-    memcpy(&r->buffer[r->p_head], bd, sizeof(struct buffer_descriptor));
-    r->p_head = next_index;
-    r->p_tail = r->p_head;
-    printf("ring submit done\n");
     return;
-
 }
 
 // server requests from the buffer using this
