@@ -5,7 +5,7 @@
 #include <string.h>
 
 int init_ring(struct ring *r) {
-    printf("init ring\n");
+    // printf("init ring\n");
     r->p_head = 0;
     r->p_tail = 0;
     r->c_head = 0;
@@ -15,7 +15,7 @@ int init_ring(struct ring *r) {
 
 // client submits new requests to buffer through this
 void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
-    printf("ring submit %d\n",bd->k);
+    // printf("ring submit %d\n",bd->k);
     while (1) {
         int p_head = r->p_head;
         int next_index = p_head + 1;
@@ -39,19 +39,22 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
 
 // server requests from the buffer using this
 void ring_get(struct ring *r, struct buffer_descriptor *bd) {
-    printf("ring get\n");
+    // printf("ring get\n");
     while (1) {
         if (r->c_head == r->p_tail) {
             continue;
         }
-        int next_index = r->c_tail + 1;
+        int c_head = r->c_head;
+        int next_index = r->c_head + 1;
         if (next_index >= RING_SIZE) {
             next_index = 0;
         }
-        memcpy(bd, &r->buffer[r->c_head], sizeof(struct buffer_descriptor));
-        r->c_head = next_index;
+        if (!__atomic_compare_exchange(&r->c_head,&c_head,&next_index,false,__ATOMIC_RELAXED,__ATOMIC_RELAXED)) {
+            continue;
+        }
+        memcpy(bd, &r->buffer[c_head], sizeof(struct buffer_descriptor));
+        while (r->c_tail != c_head) {}
         r->c_tail = r->c_head;
         break;
     }
-    
 }
