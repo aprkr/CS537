@@ -32,7 +32,7 @@ int put(key_type k, value_type v) {
 
 int get(key_type k) {
     index_t index = hash_function(k, table_size);
-    if (key_array[index] != 0) {
+    if (key_array[index] == k) {
         return value_array[index];
     } else {
         return 0;
