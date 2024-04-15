@@ -16,15 +16,46 @@ pthread_t threads[MAX_THREADS];
 struct ring *ring;
 void *mem;
 
-key_type *key_array;
-value_type *value_array;
+typedef struct {
+    key_type key;
+    value_type value;
+} hash_entry;
+hash_entry *hash_table;
+int ht_cur_length = 0;
 pthread_mutex_t lock2 = PTHREAD_MUTEX_INITIALIZER;
 
 int put(key_type k, value_type v) {
     index_t index = hash_function(k, table_size);
     pthread_mutex_lock(&lock2);
-    value_array[index] = v;
-    key_array[index] = k;
+    if (ht_cur_length >= (table_size / 2)) {
+        hash_entry *new_hash_table = calloc(table_size * 2, sizeof(hash_entry));
+        for(int i = 0; i < table_size; i++) {
+            key_type cur_key = hash_table[i].key;
+            if (cur_key != 0) {
+                index_t new_index = hash_function(cur_key, table_size * 2);
+                while(new_hash_table[new_index].key != 0) {
+                    new_index++;
+                    if (new_index >= (table_size * 2)) {
+                        new_index = 0;
+                    }
+                }
+                new_hash_table[new_index].key = cur_key;
+                new_hash_table[new_index].value = hash_table[i].value;
+            }
+        }
+        free(hash_table);
+        hash_table = new_hash_table;
+        table_size = table_size * 2;
+    }
+    while(hash_table[index].key != 0) {
+        index++;
+        if (index >= table_size) {
+            index = 0;
+        }
+    }
+    hash_table[index].value = v;
+    hash_table[index].key = k;
+    ht_cur_length++;
     pthread_mutex_unlock(&lock2);
     return 0;
 
@@ -32,12 +63,21 @@ int put(key_type k, value_type v) {
 
 int get(key_type k) {
     index_t index = hash_function(k, table_size);
-    if (key_array[index] == k) {
-        return value_array[index];
-    } else {
-        return 0;
+    pthread_mutex_lock(&lock2);
+    while(hash_table[index].key != 0) {
+        key_type key = hash_table[index].key;
+        if (key == k) {
+            value_type value = hash_table[index].value;
+            pthread_mutex_unlock(&lock2);
+            return value;
+        }
+        index++;
+        if (index >= table_size) {
+            index = 0;
+        }
     }
-
+    pthread_mutex_unlock(&lock2);
+    return 0;
 }
 
 void *thread_func(void *arg) {
@@ -68,8 +108,7 @@ int main(int argc, char *argv[]) {
 	
 		case 's':
 		table_size = atoi(optarg);
-        key_array = calloc(table_size, sizeof(key_type));
-        value_array = calloc(table_size, sizeof(key_type));
+        hash_table = calloc(table_size, sizeof(hash_entry));
 		break;
 
 		case 'v':
