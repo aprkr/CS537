@@ -48,6 +48,9 @@ int put(key_type k, value_type v) {
         table_size = table_size * 2;
     }
     while(hash_table[index].key != 0) {
+        if (hash_table[index].key == k) {
+            break;
+        }
         index++;
         if (index >= table_size) {
             index = 0;
