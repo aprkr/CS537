@@ -122,7 +122,10 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	int fd = open("shmem_file", O_RDWR);
-    mem = mmap(NULL, sizeof(struct ring), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    FILE *fp = fopen("shmem_file", "r");
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     ring = (struct ring *)mem;
     for (int i = 0; i < num_threads; i++)
