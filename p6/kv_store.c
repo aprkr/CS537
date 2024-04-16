@@ -22,11 +22,11 @@ typedef struct {
 } hash_entry;
 hash_entry *hash_table;
 int ht_cur_length = 0;
-pthread_mutex_t lock2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t  rwlock;
 
 int put(key_type k, value_type v) {
+    pthread_rwlock_wrlock(&rwlock);
     index_t index = hash_function(k, table_size);
-    pthread_mutex_lock(&lock2);
     if (ht_cur_length >= (table_size / 2)) {
         hash_entry *new_hash_table = calloc(table_size * 2, sizeof(hash_entry));
         for(int i = 0; i < table_size; i++) {
@@ -59,19 +59,19 @@ int put(key_type k, value_type v) {
     hash_table[index].value = v;
     hash_table[index].key = k;
     ht_cur_length++;
-    pthread_mutex_unlock(&lock2);
+    pthread_rwlock_unlock(&rwlock);
     return 0;
 
 }
 
 int get(key_type k) {
     index_t index = hash_function(k, table_size);
-    pthread_mutex_lock(&lock2);
+    pthread_rwlock_rdlock(&rwlock);
     while(hash_table[index].key != 0) {
         key_type key = hash_table[index].key;
         if (key == k) {
             value_type value = hash_table[index].value;
-            pthread_mutex_unlock(&lock2);
+            pthread_rwlock_unlock(&rwlock);
             return value;
         }
         index++;
@@ -79,7 +79,7 @@ int get(key_type k) {
             index = 0;
         }
     }
-    pthread_mutex_unlock(&lock2);
+    pthread_rwlock_unlock(&rwlock );
     return 0;
 }
 
@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
     mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     ring = (struct ring *)mem;
+    pthread_rwlock_init(&rwlock, 0);
     for (int i = 0; i < num_threads; i++)
 		pthread_create(&threads[i], NULL, thread_func, NULL);
     for (int i = 0; i < num_threads; i++)
