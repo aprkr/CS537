@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 	}
 	struct wfs_inode root_inode = {
 		.num = 0, // inode 0
-		.mode = 0, // directory
+		.mode = S_IFDIR | 0755, // directory
 		.size = 2 * sizeof(struct wfs_dentry), // Directory has 2 items
 		.nlinks = 2, // Directory references itself twice
 		.atim = time(NULL),
