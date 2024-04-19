@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0};
 	memcpy(mem + sb->d_blocks_ptr, &dot_entry, sizeof(struct wfs_dentry));
 	memcpy(mem + sb->d_blocks_ptr + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
-	memset(mem + sb->i_bitmap_ptr, 0x80, 1);
-	memset(mem + sb->d_bitmap_ptr, 0x80, 1);
+	memset(mem + sb->i_bitmap_ptr, 0x1, 1);
+	memset(mem + sb->d_bitmap_ptr, 0x1, 1);
 	munmap(mem, size);
 }
