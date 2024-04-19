@@ -26,7 +26,22 @@ static int getInodeFromPath(const char *p) {
     if (numslashes == 0) {
         return 0;
     } else {
-        return -ENOENT;
+        int curInodeNum = 0;
+        for (int i = 0; i < numslashes; i++) {
+            struct wfs_inode *curInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * curInodeNum);
+            int numEntries = (curInode->size / sizeof(struct wfs_dentry));
+            for (int j = 0; j < numEntries; j++) {
+                struct wfs_dentry *curEntry = (struct wfs_dentry*)(mem + curInode->blocks[0] + j * sizeof(struct wfs_dentry));
+                if (strcmp(curEntry->name, names[i])) {
+                    curInodeNum = curEntry->num;
+                    break;
+                }
+            }
+            if (curInode->num == curInodeNum) {
+                return -ENOENT;
+            }
+        }
+        return curInodeNum;
     }
 }
 
@@ -58,6 +73,7 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
 
 static int wfs_mkdir(const char* path, mode_t mode) {
     printf("mkdir\n");
+    
     return 0;
 }
 
