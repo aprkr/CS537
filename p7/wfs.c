@@ -34,6 +34,7 @@ static int my_getattr(const char *path, struct stat *stbuf) {
     printf("getattr %s\n",path);
     int inodeNum = getInodeFromPath(path);
     if (inodeNum == -ENOENT) {
+        printf("Path not found\n");
         return -ENOENT;
     }
     
@@ -83,6 +84,8 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
 
 static int wfs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi) {
     printf("readdir\n");
+    filler(buf, ".", NULL, 0);
+    filler(buf, "..", NULL, 0);
     return 0;
 }
 
