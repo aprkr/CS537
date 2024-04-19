@@ -32,7 +32,10 @@ int main(int argc, char *argv[]) {
 		return 1;
 		}
 	}
-    printf("Initializing %s with WFS with %lu inodes and %lu data blocks",image_file,num_inodes,num_data_blocks);
+	if ((num_data_blocks % 32) != 0) { // round up to nearest 32 data blocks
+		num_data_blocks = num_data_blocks + 32 - (num_data_blocks % 32);
+	}
+    printf("Initializing %s with WFS with %lu inodes and %lu data blocks\n",image_file,num_inodes,num_data_blocks);
 	int fd = open(image_file, O_RDWR);
 	FILE *fp = fopen(image_file, "r");
 	fseek(fp, 0, SEEK_END);
@@ -45,10 +48,18 @@ int main(int argc, char *argv[]) {
 	memset(mem, 0, size);
 	sb->num_inodes = num_inodes;
 	sb->num_data_blocks = num_data_blocks;
-	sb->i_bitmap_ptr = 0 + BLOCK_SIZE;
-	sb->d_bitmap_ptr = 0 + (BLOCK_SIZE * 2);
-	sb->i_blocks_ptr = 0 + (BLOCK_SIZE * 3);
-	sb->d_blocks_ptr = 0 + (BLOCK_SIZE * 4);
+	int i_bitmap_numblocks = (((num_inodes + 7) / 8 + BLOCK_SIZE - 1) / BLOCK_SIZE); // each block can hold bitmap for (8 * 512) 4096 items
+	int d_bitmap_numblocks = (((num_data_blocks + 7) / 8 + BLOCK_SIZE - 1) / BLOCK_SIZE);
+	int i_blocks_numblocks = ((num_inodes * 128 + BLOCK_SIZE - 1) / BLOCK_SIZE); // 4 inodes per block
+	sb->i_bitmap_ptr = BLOCK_SIZE;
+	sb->d_bitmap_ptr = sb->i_bitmap_ptr + BLOCK_SIZE * i_bitmap_numblocks;
+	sb->i_blocks_ptr = sb->d_bitmap_ptr + BLOCK_SIZE * d_bitmap_numblocks;
+	sb->d_blocks_ptr = sb->i_blocks_ptr + BLOCK_SIZE * i_blocks_numblocks;
+	int required_blocks = 1 + i_bitmap_numblocks + d_bitmap_numblocks + i_blocks_numblocks + num_data_blocks;
+	if ((required_blocks * BLOCK_SIZE) > size) {
+		printf("Image file not big enough to accomodate specified filesystem, requires %u bytes\n", required_blocks * BLOCK_SIZE);
+		return 1;
+	}
 	struct wfs_inode root_inode = {
 		.num = 0, // inode 0
 		.mode = 0, // directory
