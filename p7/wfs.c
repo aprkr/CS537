@@ -141,11 +141,10 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     newInode->ctim = time(NULL);
     newInode->num = newInodeNum;
 
-    struct wfs_dentry *newEntry;
+    struct wfs_dentry *newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * 2);
     strcpy(newEntry->name, child);
     newEntry->num = newInodeNum;
 
-    memcpy(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * 2, newEntry, sizeof(struct wfs_dentry)); // TODO check for open space in directory data block
     parentInode->size += sizeof(struct wfs_dentry);
     return 0;
 }
@@ -179,9 +178,15 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
 
 static int wfs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi) {
     printf("readdir\n");
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
-    filler(buf, "idk", NULL, 0); // TODO
+    int inodeNum = getInodeFromPath(path);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    off_t offs = inode->blocks[0];
+    struct wfs_dentry *curEntry;
+    int num_entries = inode->size / sizeof(struct wfs_dentry);
+    for (int i = 0; i < num_entries; i++) {
+        curEntry = (struct wfs_dentry *)(mem + offs + i * sizeof(struct wfs_dentry));
+        filler(buf, curEntry->name, NULL, 0);
+    }
     return 0;
 }
 
