@@ -141,7 +141,15 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     newInode->ctim = time(NULL);
     newInode->num = newInodeNum;
 
-    struct wfs_dentry *newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * 2);
+    struct wfs_dentry *newEntry;
+    int i;
+    for (i = 2; i < 16; i++) {
+        newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
+        if (newEntry->name[0] == 0) {
+            break;
+        }
+    }
+
     strcpy(newEntry->name, child);
     newEntry->num = newInodeNum;
 
