@@ -10,6 +10,7 @@
 
 __UINT8_TYPE__ *mem;
 struct wfs_sb *sb;
+#define BITSPERINT (sizeof(unsigned int) * 8)
 
 static int getInodeFromPath(const char *p) {
     char path[128];
@@ -32,7 +33,7 @@ static int getInodeFromPath(const char *p) {
             int numEntries = (curInode->size / sizeof(struct wfs_dentry));
             for (int j = 0; j < numEntries; j++) {
                 struct wfs_dentry *curEntry = (struct wfs_dentry*)(mem + curInode->blocks[0] + j * sizeof(struct wfs_dentry));
-                if (strcmp(curEntry->name, names[i])) {
+                if (strcmp(curEntry->name, names[i]) == 0) {
                     curInodeNum = curEntry->num;
                     break;
                 }
@@ -45,6 +46,56 @@ static int getInodeFromPath(const char *p) {
     }
 }
 
+static int parentInodeFromPath(const char *p, char *child) {
+    char path[128];
+    strcpy(path, p);
+    char *parent = strrchr(path, '/');
+    strcpy(child, parent + 1);
+    if (parent == path) {
+        return 0;
+    }
+    parent[0] = 0;
+    return getInodeFromPath(path);
+}
+
+static int allocateInode() {
+    unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr);
+    unsigned int *maxptr = (unsigned int*)(mem + sb->d_bitmap_ptr);
+    int num_ints = 0;
+    while (ptr < maxptr) {
+        if (*ptr == UINTMAX_MAX) {
+            ptr++;
+            num_ints++;
+            continue;
+        }
+        int index = __builtin_ffs(~*ptr) - 1; // ffs finds first set bit, we invert the current ptr to get index of first 0
+        *ptr |= 1 << index;
+        int inode = (num_ints * BITSPERINT) + index;
+        printf("Allocating inode number %u\n",inode);
+        return inode;
+    }
+    return 0;
+}
+
+static int allocateDataBlocks() {
+    unsigned int *ptr = (unsigned int*)(mem + sb->d_bitmap_ptr);
+    unsigned int *maxptr = (unsigned int*)(mem + sb->i_blocks_ptr);
+    int num_ints = 0;
+    while (ptr < maxptr) {
+        if (*ptr == UINTMAX_MAX) {
+            ptr++;
+            num_ints++;
+            continue;
+        }
+        int index = __builtin_ffs(~*ptr) - 1; // ffs finds first set bit, we invert the current ptr to get index of first 0
+        *ptr |= 1 << index;
+        int blockNum = (num_ints * BITSPERINT) + index;
+        printf("Allocating data block number %u\n",blockNum);
+        return blockNum;
+    }
+    return 0;
+}
+
 static int my_getattr(const char *path, struct stat *stbuf) {
     printf("getattr %s\n",path);
     int inodeNum = getInodeFromPath(path);
@@ -54,20 +105,48 @@ static int my_getattr(const char *path, struct stat *stbuf) {
     }
     
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    printf("Got inode %u with size %lu\n",inodeNum,inode->size); fflush(stdout);
     
     stbuf->st_mode = inode->mode;
     stbuf->st_uid = inode->uid;
     stbuf->st_gid = inode->gid;
     stbuf->st_size = inode->size;
-    stbuf->st_nlink = inode->nlinks;
     stbuf->st_atime = inode->atim;
     stbuf->st_mtime = inode->mtim;
-    stbuf->st_ctime = inode->ctim;
+    // The ones below aren't required according to the instructions
+    // stbuf->st_ctime = inode->ctim;
+    // stbuf->st_nlink = inode->nlinks;
     return 0;
 }
 
 static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     printf("mknod\n");
+    if (getInodeFromPath(path) != -ENOENT) {
+        return -EEXIST;
+    }
+    char child[128];
+    int parentInodeNum = parentInodeFromPath(path, child);
+    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
+    int newInodeNum = allocateInode();
+    int newDataBlock = allocateDataBlocks();
+
+    struct wfs_inode *newInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * newInodeNum);
+    newInode->blocks[0] = newDataBlock;
+    newInode->mode = S_IFREG | 0644;
+    newInode->size = 0;
+    newInode->uid = getuid();
+    newInode->gid = getgid();
+    newInode->atim = time(NULL);
+    newInode->mtim = time(NULL);
+    newInode->ctim = time(NULL);
+    newInode->num = newInodeNum;
+
+    struct wfs_dentry *newEntry;
+    strcpy(newEntry->name, child);
+    newEntry->num = newInodeNum;
+
+    memcpy(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * 2, newEntry, sizeof(struct wfs_dentry)); // TODO check for open space in directory data block
+    parentInode->size += sizeof(struct wfs_dentry);
     return 0;
 }
 
@@ -102,6 +181,7 @@ static int wfs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_
     printf("readdir\n");
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
+    filler(buf, "idk", NULL, 0); // TODO
     return 0;
 }
 
