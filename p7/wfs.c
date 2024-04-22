@@ -21,7 +21,7 @@ static int getInodeFromPath(const char *p) {
     while(input != NULL) {
         names[numslashes] = input;
         numslashes++;
-        input = strtok(NULL, " ");
+        input = strtok(NULL, "/");
     }
     names = (char **)realloc(names, numslashes * sizeof(char*));
     if (numslashes == 0) {
