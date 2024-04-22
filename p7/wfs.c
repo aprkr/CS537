@@ -181,7 +181,7 @@ static int wfs_mkdir(const char* path, mode_t mode) {
     return 0;
 }
 
-static int removeInodeRecurse(int inodeNum, char *name) {
+static void removeInodeRecurse(int inodeNum, char *name) {
     // clear bitmaps
     unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / 512) * BLOCK_SIZE + (inodeNum / 32));
     *ptr ^= 1 << (inodeNum % BITSPERINT);
@@ -237,12 +237,52 @@ static int wfs_rmdir(const char* path) {
 
 static int wfs_read(const char* path, char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
     printf("read\n");
-
-    return 0;
+    int inodeNum = getInodeFromPath(path);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    unsigned int *ptr = mem + inode->blocks[0];
+    printf("%d %d\n",size,inode->blocks[0]);
+    memcpy(buf, ptr, inode->size);
+    return inode->size;
 }
 
 static int wfs_write(const char* path, const char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
     printf("write\n");
+    int inodeNum = getInodeFromPath(path);
+    int neededNumBlocks = (offset + size) / BLOCK_SIZE + 1;
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    int curNumBlocks = inode->size / BLOCK_SIZE + 1;
+    if (curNumBlocks < neededNumBlocks) {
+        for (int i = curNumBlocks; i < neededNumBlocks; i++) {
+            int newDataBlock = allocateDataBlocks();
+            inode->blocks[i] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+        }
+    }
+    int bytesRemaining = size;
+    int curBlock = offset / BLOCK_SIZE;
+    
+    printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
+    unsigned int *ptr;
+    
+    if (size > BLOCK_SIZE) {
+        int start = offset % BLOCK_SIZE;
+        ptr = mem + inode->blocks[curBlock] + start;
+        memcpy(ptr, buf, BLOCK_SIZE - start);
+        bytesRemaining -= (BLOCK_SIZE - start);
+        curBlock++;
+    }
+    
+    while (bytesRemaining > 0) {
+        ptr = mem + inode->blocks[curBlock];
+        if (bytesRemaining < BLOCK_SIZE) {
+            memcpy(ptr, buf + (size - bytesRemaining), bytesRemaining);
+            break;
+        } else {
+            memcpy(ptr, buf + (size - bytesRemaining), BLOCK_SIZE);
+            bytesRemaining -= BLOCK_SIZE;
+        }
+        curBlock++;
+    }
+    inode->size += size;
     return 0;
 }
 
