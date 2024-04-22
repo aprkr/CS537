@@ -139,6 +139,7 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
     newInode->mtim = time(NULL);
     newInode->ctim = time(NULL);
     newInode->num = newInodeNum;
+    newInode->parent = parentInodeNum;
 
     struct wfs_dentry *newEntry;
     int i;
@@ -172,7 +173,7 @@ static int wfs_mkdir(const char* path, mode_t mode) {
         return -EEXIST;
     }
     struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
-	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0}; // TODO
+	struct wfs_dentry dotdot_entry = {.name = "..", .num = new->parent};
 	memcpy(mem + new->blocks[0], &dot_entry, sizeof(struct wfs_dentry));
 	memcpy(mem + new->blocks[0] + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
     new->size = 2 * sizeof(struct wfs_dentry);
@@ -182,6 +183,36 @@ static int wfs_mkdir(const char* path, mode_t mode) {
 
 static int wfs_unlink(const char* path) {
     printf("unlink\n");
+    int inodeNum = getInodeFromPath(path);
+    char *name = strrchr(path, '/') + 1;
+    // clear bitmaps
+    unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / 512) * BLOCK_SIZE + (inodeNum / 32));
+    *ptr ^= 1 << (inodeNum % BITSPERINT);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    int numBlocks = inode->size / BLOCK_SIZE + 1;
+    for (int i = 0; i < numBlocks; i++) {
+        int blockNum = (inode->blocks[i] - sb->d_blocks_ptr) / BLOCK_SIZE;
+        ptr = (unsigned int*)(mem + sb->d_bitmap_ptr + (blockNum / 512) * BLOCK_SIZE + (blockNum / 32));
+        *ptr ^= 1 << (blockNum % BITSPERINT);
+    }
+    // remove entry from directory
+    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inode->parent);
+    int numEntries = parentInode->size / sizeof(struct wfs_dentry);
+    for (int i = 2; i < numEntries; i++) {
+        struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
+        printf("%s %s\n",curEntry->name,name);
+        if (strcmp(name, curEntry->name) == 0) {
+            parentInode->size -= sizeof(struct wfs_dentry);
+            if (i == numEntries - 1) {
+                memset(curEntry, 0, sizeof(struct wfs_dentry));
+            } else {  // copy last entry to current entry
+                memcpy(curEntry, mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * (numEntries - 1), sizeof(struct wfs_dentry));
+            }
+            break;
+        }
+    }
+    // memset inode to 0
+    memset(inode, 0, sizeof(struct wfs_inode));
     return 0;
 }
 

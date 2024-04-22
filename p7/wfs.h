@@ -39,6 +39,7 @@ struct wfs_sb {
 // Inode
 struct wfs_inode {
     int     num;      /* Inode number */
+    int     parent;
     mode_t  mode;     /* File type and mode */
     uid_t   uid;      /* User ID of owner */
     gid_t   gid;      /* Group ID of owner */
