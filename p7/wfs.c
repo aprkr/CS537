@@ -181,10 +181,7 @@ static int wfs_mkdir(const char* path, mode_t mode) {
     return 0;
 }
 
-static int wfs_unlink(const char* path) {
-    printf("unlink\n");
-    int inodeNum = getInodeFromPath(path);
-    char *name = strrchr(path, '/') + 1;
+static int removeInodeRecurse(int inodeNum, char *name) {
     // clear bitmaps
     unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / 512) * BLOCK_SIZE + (inodeNum / 32));
     *ptr ^= 1 << (inodeNum % BITSPERINT);
@@ -200,7 +197,6 @@ static int wfs_unlink(const char* path) {
     int numEntries = parentInode->size / sizeof(struct wfs_dentry);
     for (int i = 2; i < numEntries; i++) {
         struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
-        printf("%s %s\n",curEntry->name,name);
         if (strcmp(name, curEntry->name) == 0) {
             parentInode->size -= sizeof(struct wfs_dentry);
             if (i == numEntries - 1) {
@@ -211,13 +207,31 @@ static int wfs_unlink(const char* path) {
             break;
         }
     }
+    // If using rmdir, remove all contents of directory
+    if ((inode->mode & S_IFDIR) == S_IFDIR) {
+        int numEntries = inode->size / sizeof(struct wfs_dentry);
+        for (int i = 2; i < numEntries; i++) {
+            struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + inode->blocks[0] + sizeof(struct wfs_dentry) * i);
+            removeInodeRecurse(curEntry->num,curEntry->name);
+        }
+    }
     // memset inode to 0
     memset(inode, 0, sizeof(struct wfs_inode));
+}
+
+static int wfs_unlink(const char* path) {
+    printf("unlink\n");
+    int inodeNum = getInodeFromPath(path);
+    char *name = strrchr(path, '/') + 1;
+    removeInodeRecurse(inodeNum, name);
     return 0;
 }
 
 static int wfs_rmdir(const char* path) {
     printf("rmdir\n");
+    int inodeNum = getInodeFromPath(path);
+    char *name = strrchr(path, '/') + 1;
+    removeInodeRecurse(inodeNum, name);
     return 0;
 }
 
