@@ -119,10 +119,9 @@ static int my_getattr(const char *path, struct stat *stbuf) {
     return 0;
 }
 
-static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
-    printf("mknod\n");
+static struct wfs_inode *createFile(const char *path, mode_t mode) {
     if (getInodeFromPath(path) != -ENOENT) {
-        return -EEXIST;
+        return NULL;
     }
     char child[128];
     int parentInodeNum = parentInodeFromPath(path, child);
@@ -131,8 +130,8 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     int newDataBlock = allocateDataBlocks();
 
     struct wfs_inode *newInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * newInodeNum);
-    newInode->blocks[0] = newDataBlock;
-    newInode->mode = S_IFREG | 0644;
+    newInode->blocks[0] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+    newInode->mode = mode;
     newInode->size = 0;
     newInode->uid = getuid();
     newInode->gid = getgid();
@@ -154,12 +153,30 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     newEntry->num = newInodeNum;
 
     parentInode->size += sizeof(struct wfs_dentry);
+    return newInode;
+}
+
+static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
+    printf("mknod\n");
+    struct wfs_inode *new = createFile(path, mode);
+    if (new == NULL) {
+        return -EEXIST;
+    }
     return 0;
 }
 
 static int wfs_mkdir(const char* path, mode_t mode) {
     printf("mkdir\n");
-    
+    struct wfs_inode *new = createFile(path, mode);
+    if (new == NULL) {
+        return -EEXIST;
+    }
+    struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
+	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0}; // TODO
+	memcpy(mem + new->blocks[0], &dot_entry, sizeof(struct wfs_dentry));
+	memcpy(mem + new->blocks[0] + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
+    new->size = 2 * sizeof(struct wfs_dentry);
+    new->mode |= S_IFDIR;
     return 0;
 }
 
