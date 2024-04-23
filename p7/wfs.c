@@ -239,10 +239,36 @@ static int wfs_read(const char* path, char *buf, size_t size, off_t offset, stru
     printf("read\n");
     int inodeNum = getInodeFromPath(path);
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
-    unsigned int *ptr = mem + inode->blocks[0];
-    printf("%d %d\n",size,inode->blocks[0]);
-    memcpy(buf, ptr, inode->size);
-    return inode->size;
+
+    if ((inode->size - offset) < size) {
+        size = inode->size - offset;
+    }
+    
+    int bytesRemaining = size;
+    int curBlock = offset / BLOCK_SIZE;
+    
+    printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
+    unsigned char *ptr;
+    int start = offset % BLOCK_SIZE;
+    if (start) {
+        ptr = mem + inode->blocks[curBlock] + start;
+        memcpy(buf, ptr, BLOCK_SIZE - start);
+        bytesRemaining -= BLOCK_SIZE - start;
+        curBlock++;
+    }
+    
+    while (bytesRemaining > 0) {
+        ptr = mem + inode->blocks[curBlock];
+        if (bytesRemaining < BLOCK_SIZE) {
+            memcpy(buf + (size - bytesRemaining), ptr , bytesRemaining);
+            break;
+        } else {
+            memcpy(buf + (size - bytesRemaining), ptr, BLOCK_SIZE);
+            bytesRemaining -= BLOCK_SIZE;
+        }
+        curBlock++;
+    }
+    return size;
 }
 
 static int wfs_write(const char* path, const char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
@@ -261,7 +287,7 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
     int curBlock = offset / BLOCK_SIZE;
     
     printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
-    unsigned int *ptr;
+    unsigned char *ptr;
     
     if (size > BLOCK_SIZE) {
         int start = offset % BLOCK_SIZE;
@@ -283,7 +309,7 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
         curBlock++;
     }
     inode->size += size;
-    return 0;
+    return size;
 }
 
 static int wfs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi) {
