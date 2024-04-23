@@ -10,6 +10,7 @@
 
 __UINT8_TYPE__ *mem;
 struct wfs_sb *sb;
+int error;
 #define BITSPERINT (sizeof(unsigned int) * 8)
 
 static int getInodeFromPath(const char *p) {
@@ -121,13 +122,22 @@ static int my_getattr(const char *path, struct stat *stbuf) {
 
 static struct wfs_inode *createFile(const char *path, mode_t mode) {
     if (getInodeFromPath(path) != -ENOENT) {
+        error = -EEXIST;
         return NULL;
     }
     char child[128];
     int parentInodeNum = parentInodeFromPath(path, child);
     struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
     int newInodeNum = allocateInode();
+    if (newInodeNum == 0) {
+        error = -ENOSPC;
+        return NULL;
+    }
     int newDataBlock = allocateDataBlocks();
+    if (newDataBlock == 0) {
+        error = -ENOSPC;
+        return NULL;
+    }
 
     struct wfs_inode *newInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * newInodeNum);
     newInode->blocks[0] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
@@ -149,6 +159,10 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
             break;
         }
     }
+    if (i == 16) {
+        error = -ENOSPC;
+        return NULL;
+    }
 
     strcpy(newEntry->name, child);
     newEntry->num = newInodeNum;
@@ -161,7 +175,7 @@ static int wfs_mknod(const char* path, mode_t mode, dev_t rdev) {
     printf("mknod\n");
     struct wfs_inode *new = createFile(path, mode);
     if (new == NULL) {
-        return -EEXIST;
+        return error;
     }
     return 0;
 }
@@ -170,7 +184,7 @@ static int wfs_mkdir(const char* path, mode_t mode) {
     printf("mkdir\n");
     struct wfs_inode *new = createFile(path, mode);
     if (new == NULL) {
-        return -EEXIST;
+        return error;
     }
     struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
 	struct wfs_dentry dotdot_entry = {.name = "..", .num = new->parent};
@@ -247,7 +261,6 @@ static int wfs_read(const char* path, char *buf, size_t size, off_t offset, stru
     int bytesRemaining = size;
     int curBlock = offset / BLOCK_SIZE;
     
-    printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
     unsigned char *ptr;
     int start = offset % BLOCK_SIZE;
     if (start) {
@@ -275,6 +288,9 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
     printf("write\n");
     int inodeNum = getInodeFromPath(path);
     int neededNumBlocks = (offset + size) / BLOCK_SIZE + 1;
+    if (neededNumBlocks > N_BLOCKS) {
+        return -ENOSPC;
+    }
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
     int curNumBlocks = inode->size / BLOCK_SIZE + 1;
     if (curNumBlocks < neededNumBlocks) {
