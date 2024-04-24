@@ -202,61 +202,54 @@ static int wfs_mkdir(const char* path, mode_t mode) {
     return 0;
 }
 
-static void removeInodeRecurse(int inodeNum, char *name) {
+static void removeInodeRecurse(const char *path) {
+    int inodeNum = getInodeFromPath(path);
+    char *name = strrchr(path, '/') + 1;
     // clear bitmaps
-    unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / BLOCK_SIZE) * BLOCK_SIZE + (inodeNum / 32));
+    unsigned char *ptr = (unsigned char*)(mem + sb->i_bitmap_ptr + (inodeNum / 8));
     *ptr ^= 1 << (inodeNum % BITSPERINT);
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
-    int numBlocks = inode->size / BLOCK_SIZE + 1;
+    int numBlocks = (inode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     for (int i = 0; i < numBlocks; i++) {
         int blockNum = (inode->blocks[i] - sb->d_blocks_ptr) / BLOCK_SIZE;
-        ptr = (unsigned int*)(mem + sb->d_bitmap_ptr + (blockNum / 512) * BLOCK_SIZE + (blockNum / 32));
+        ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
         *ptr ^= 1 << (blockNum % BITSPERINT);
-    }
-    // If using rmdir, remove all contents of directory
-    if ((inode->mode & S_IFDIR) == S_IFDIR) {
-        int numEntries = inode->size / sizeof(struct wfs_dentry);
-        for (int i = 0; i < numEntries; i++) {
-            struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + inode->blocks[0] + sizeof(struct wfs_dentry) * i);
-            removeInodeRecurse(curEntry->num,curEntry->name);
-        }
     }
     // memset inode to 0
     memset(inode, 0, sizeof(struct wfs_inode));
-}
-
-static void removeInodeFromDirectory(int parentInodeNum, char *name) {
+    // remove from parent directory
+    int parentInodeNum = parentInodeFromPath(path, name);
     struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * parentInodeNum);
-    int numEntries = parentInode->size / sizeof(struct wfs_dentry);
-    for (int i = 0; i < numEntries; i++) {
-        struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
-        if (strcmp(name, curEntry->name) == 0) {
-            parentInode->size -= sizeof(struct wfs_dentry);
-            if (i == numEntries - 1) {
-                memset(curEntry, 0, sizeof(struct wfs_dentry));
-            } else {  // copy last entry to current entry
-                memcpy(curEntry, mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * (numEntries - 1), sizeof(struct wfs_dentry));
+    int numParentBlocks = (parentInode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    for (int j = 0; j < numParentBlocks; j++) {
+        for (int i = 0; i < 16; i++) {
+            struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * i);
+            if (strcmp(name, curEntry->name) == 0) {
+                if (i == 15) {
+                    memset(curEntry, 0, sizeof(struct wfs_dentry));
+                } else if (i == 0) {
+                    int blockNum = (parentInode->blocks[j] - sb->d_blocks_ptr) / BLOCK_SIZE;
+                    ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
+                    *ptr ^= 1 << (blockNum % BITSPERINT);
+                    parentInode->size -= BLOCK_SIZE;
+                } else {  // copy last entry to current entry
+                    memcpy(curEntry, mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * 15, sizeof(struct wfs_dentry));
+                }
+                break;
             }
-            break;
         }
     }
 }
 
 static int wfs_unlink(const char* path) {
     printf("unlink\n");
-    int inodeNum = getInodeFromPath(path);
-    char *name = strrchr(path, '/') + 1;
-    removeInodeRecurse(inodeNum, name);
-    removeInodeFromDirectory(parentInodeFromPath(path, name), name);
+    removeInodeRecurse(path);
     return 0;
 }
 
 static int wfs_rmdir(const char* path) {
     printf("rmdir\n");
-    int inodeNum = getInodeFromPath(path);
-    char *name = strrchr(path, '/') + 1;
-    removeInodeRecurse(inodeNum, name);
-    removeInodeFromDirectory(parentInodeFromPath(path, name), name);
+    removeInodeRecurse(path);
     return 0;
 }
 
