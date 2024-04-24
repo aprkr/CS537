@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 	struct wfs_inode root_inode = {
 		.num = 0, // inode 0
 		.mode = S_IFDIR | 0755, // directory
-		.size = 2 * sizeof(struct wfs_dentry), // Directory has 2 items
+		.size = 0, // Directory has 2 items
 		.nlinks = 2, // Directory references itself twice
 		.atim = time(NULL),
 		.mtim = time(NULL),
@@ -71,10 +71,10 @@ int main(int argc, char *argv[]) {
 		.blocks[0] = sb->d_blocks_ptr // Reference to actual data for this directory
 	};
 	memcpy(mem + sb->i_blocks_ptr, &root_inode, sizeof(struct wfs_inode));
-	struct wfs_dentry dot_entry = {.name = ".", .num = 0};
-	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0};
-	memcpy(mem + sb->d_blocks_ptr, &dot_entry, sizeof(struct wfs_dentry));
-	memcpy(mem + sb->d_blocks_ptr + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
+	// struct wfs_dentry dot_entry = {.name = ".", .num = 0};
+	// struct wfs_dentry dotdot_entry = {.name = "..", .num = 0};
+	// memcpy(mem + sb->d_blocks_ptr, &dot_entry, sizeof(struct wfs_dentry));
+	// memcpy(mem + sb->d_blocks_ptr + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
 	memset(mem + sb->i_bitmap_ptr, 0x1, 1);
 	memset(mem + sb->d_bitmap_ptr, 0x1, 1);
 	munmap(mem, size);

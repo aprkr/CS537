@@ -153,7 +153,7 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
 
     struct wfs_dentry *newEntry;
     int i;
-    for (i = 2; i < 16; i++) {
+    for (i = 0; i < 16; i++) {
         newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
         if (newEntry->name[0] == 0) {
             break;
@@ -186,11 +186,11 @@ static int wfs_mkdir(const char* path, mode_t mode) {
     if (new == NULL) {
         return error;
     }
-    struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
-	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0}; // These can be removed
-	memcpy(mem + new->blocks[0], &dot_entry, sizeof(struct wfs_dentry));
-	memcpy(mem + new->blocks[0] + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
-    new->size = 2 * sizeof(struct wfs_dentry);
+    // struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
+	// struct wfs_dentry dotdot_entry = {.name = "..", .num = 0}; // These can be removed
+	// memcpy(mem + new->blocks[0], &dot_entry, sizeof(struct wfs_dentry));
+	// memcpy(mem + new->blocks[0] + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
+    new->size = 0;
     new->mode |= S_IFDIR;
     return 0;
 }
@@ -209,7 +209,7 @@ static void removeInodeRecurse(int inodeNum, char *name) {
     // If using rmdir, remove all contents of directory
     if ((inode->mode & S_IFDIR) == S_IFDIR) {
         int numEntries = inode->size / sizeof(struct wfs_dentry);
-        for (int i = 2; i < numEntries; i++) {
+        for (int i = 0; i < numEntries; i++) {
             struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + inode->blocks[0] + sizeof(struct wfs_dentry) * i);
             removeInodeRecurse(curEntry->num,curEntry->name);
         }
@@ -221,7 +221,7 @@ static void removeInodeRecurse(int inodeNum, char *name) {
 static void removeInodeFromDirectory(int parentInodeNum, char *name) {
     struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
     int numEntries = parentInode->size / sizeof(struct wfs_dentry);
-    for (int i = 2; i < numEntries; i++) {
+    for (int i = 0; i < numEntries; i++) {
         struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
         if (strcmp(name, curEntry->name) == 0) {
             parentInode->size -= sizeof(struct wfs_dentry);
