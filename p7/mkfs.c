@@ -35,6 +35,9 @@ int main(int argc, char *argv[]) {
 	if ((num_data_blocks % 32) != 0) { // round up to nearest 32 data blocks
 		num_data_blocks = num_data_blocks + 32 - (num_data_blocks % 32);
 	}
+	if ((num_inodes % 32) != 0) { // round up to nearest 32 data blocks
+		num_inodes = num_inodes + 32 - (num_inodes % 32);
+	}
     printf("Initializing %s with WFS with %lu inodes and %lu data blocks\n",image_file,num_inodes,num_data_blocks);
 	int fd = open(image_file, O_RDWR);
 	FILE *fp = fopen(image_file, "r");
