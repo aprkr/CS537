@@ -48,16 +48,15 @@ int main(int argc, char *argv[]) {
 	memset(mem, 0, size);
 	sb->num_inodes = num_inodes;
 	sb->num_data_blocks = num_data_blocks;
-	int i_bitmap_numblocks = (((num_inodes + 7) / 8 + BLOCK_SIZE - 1) / BLOCK_SIZE); // each block can hold bitmap for (8 * 512) 4096 items
-	int d_bitmap_numblocks = (((num_data_blocks + 7) / 8 + BLOCK_SIZE - 1) / BLOCK_SIZE);
-	int i_blocks_numblocks = ((num_inodes * 128 + BLOCK_SIZE - 1) / BLOCK_SIZE); // 4 inodes per block
-	sb->i_bitmap_ptr = BLOCK_SIZE;
-	sb->d_bitmap_ptr = sb->i_bitmap_ptr + BLOCK_SIZE * i_bitmap_numblocks;
-	sb->i_blocks_ptr = sb->d_bitmap_ptr + BLOCK_SIZE * d_bitmap_numblocks;
-	sb->d_blocks_ptr = sb->i_blocks_ptr + BLOCK_SIZE * i_blocks_numblocks;
-	int required_blocks = 1 + i_bitmap_numblocks + d_bitmap_numblocks + i_blocks_numblocks + num_data_blocks;
-	if ((required_blocks * BLOCK_SIZE) > size) {
-		printf("Image file not big enough to accomodate specified filesystem, requires %u bytes\n", required_blocks * BLOCK_SIZE);
+	int i_bitmap_size = ((num_inodes + 7) / 8);
+	int d_bitmap_size = ((num_data_blocks + 7) / 8);
+	sb->i_bitmap_ptr = sizeof(struct wfs_sb);
+	sb->d_bitmap_ptr = sb->i_bitmap_ptr + i_bitmap_size;
+	sb->i_blocks_ptr = sb->d_bitmap_ptr + d_bitmap_size;
+	sb->d_blocks_ptr = sb->i_blocks_ptr + BLOCK_SIZE * num_inodes;
+	int required_bytes = sb->d_blocks_ptr + num_data_blocks * BLOCK_SIZE;
+	if ((required_bytes) > size) {
+		printf("Image file not big enough to accomodate specified filesystem, requires %u bytes\n", required_bytes);
 		return 1;
 	}
 	struct wfs_inode root_inode = {
@@ -68,7 +67,6 @@ int main(int argc, char *argv[]) {
 		.atim = time(NULL),
 		.mtim = time(NULL),
 		.ctim = time(NULL),
-		.blocks[0] = sb->d_blocks_ptr // Reference to actual data for this directory
 	};
 	memcpy(mem + sb->i_blocks_ptr, &root_inode, sizeof(struct wfs_inode));
 	// struct wfs_dentry dot_entry = {.name = ".", .num = 0};
@@ -76,6 +74,6 @@ int main(int argc, char *argv[]) {
 	// memcpy(mem + sb->d_blocks_ptr, &dot_entry, sizeof(struct wfs_dentry));
 	// memcpy(mem + sb->d_blocks_ptr + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
 	memset(mem + sb->i_bitmap_ptr, 0x1, 1);
-	memset(mem + sb->d_bitmap_ptr, 0x1, 1);
+	// memset(mem + sb->d_bitmap_ptr, 0x1, 1);
 	munmap(mem, size);
 }
