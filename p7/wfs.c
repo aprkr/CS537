@@ -30,7 +30,7 @@ static int getInodeFromPath(const char *p) {
     } else {
         int curInodeNum = 0;
         for (int i = 0; i < numslashes; i++) {
-            struct wfs_inode *curInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * curInodeNum);
+            struct wfs_inode *curInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * curInodeNum);
             int numEntries = (curInode->size / sizeof(struct wfs_dentry));
             for (int j = 0; j < numEntries; j++) {
                 struct wfs_dentry *curEntry = (struct wfs_dentry*)(mem + curInode->blocks[0] + j * sizeof(struct wfs_dentry));
@@ -105,7 +105,7 @@ static int my_getattr(const char *path, struct stat *stbuf) {
         return -ENOENT;
     }
     
-    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
     printf("Got inode %u with size %lu\n",inodeNum,inode->size); fflush(stdout);
     
     stbuf->st_mode = inode->mode;
@@ -115,8 +115,8 @@ static int my_getattr(const char *path, struct stat *stbuf) {
     stbuf->st_atime = inode->atim;
     stbuf->st_mtime = inode->mtim;
     // The ones below aren't required according to the instructions
-    // stbuf->st_ctime = inode->ctim;
-    // stbuf->st_nlink = inode->nlinks;
+    stbuf->st_ctime = inode->ctim;
+    stbuf->st_nlink = inode->nlinks;
     return 0;
 }
 
@@ -127,7 +127,7 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
     }
     char child[128];
     int parentInodeNum = parentInodeFromPath(path, child);
-    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
+    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * parentInodeNum);
     int newInodeNum = allocateInode();
     if (newInodeNum == 0) {
         error = -ENOSPC;
@@ -139,7 +139,7 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
         return NULL;
     }
 
-    struct wfs_inode *newInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * newInodeNum);
+    struct wfs_inode *newInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * newInodeNum);
     newInode->blocks[0] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
     newInode->mode = mode;
     newInode->size = 0;
@@ -197,9 +197,9 @@ static int wfs_mkdir(const char* path, mode_t mode) {
 
 static void removeInodeRecurse(int inodeNum, char *name) {
     // clear bitmaps
-    unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / 512) * BLOCK_SIZE + (inodeNum / 32));
+    unsigned int *ptr = (unsigned int*)(mem + sb->i_bitmap_ptr + (inodeNum / BLOCK_SIZE) * BLOCK_SIZE + (inodeNum / 32));
     *ptr ^= 1 << (inodeNum % BITSPERINT);
-    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
     int numBlocks = inode->size / BLOCK_SIZE + 1;
     for (int i = 0; i < numBlocks; i++) {
         int blockNum = (inode->blocks[i] - sb->d_blocks_ptr) / BLOCK_SIZE;
@@ -219,7 +219,7 @@ static void removeInodeRecurse(int inodeNum, char *name) {
 }
 
 static void removeInodeFromDirectory(int parentInodeNum, char *name) {
-    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
+    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * parentInodeNum);
     int numEntries = parentInode->size / sizeof(struct wfs_dentry);
     for (int i = 0; i < numEntries; i++) {
         struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
@@ -256,7 +256,7 @@ static int wfs_rmdir(const char* path) {
 static int wfs_read(const char* path, char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
     printf("read\n");
     int inodeNum = getInodeFromPath(path);
-    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
 
     if ((inode->size - offset) < size) {
         size = inode->size - offset;
@@ -295,7 +295,7 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
     if (neededNumBlocks > N_BLOCKS) {
         return -ENOSPC;
     }
-    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
     int curNumBlocks = inode->size / BLOCK_SIZE + 1;
     if (curNumBlocks < neededNumBlocks) {
         for (int i = curNumBlocks; i < neededNumBlocks; i++) {
@@ -335,13 +335,15 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
 static int wfs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi) {
     printf("readdir\n");
     int inodeNum = getInodeFromPath(path);
-    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inodeNum);
+    struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
     off_t offs = inode->blocks[0];
     struct wfs_dentry *curEntry;
-    int num_entries = inode->size / sizeof(struct wfs_dentry);
-    for (int i = 0; i < num_entries; i++) {
+    // int num_entries = inode->size / sizeof(struct wfs_dentry);
+    for (int i = 0; i < 16; i++) {
         curEntry = (struct wfs_dentry *)(mem + offs + i * sizeof(struct wfs_dentry));
-        filler(buf, curEntry->name, NULL, 0);
+        if (curEntry->name[0] != 0) {
+            filler(buf, curEntry->name, NULL, 0);
+        }
     }
     return 0;
 }
