@@ -155,13 +155,13 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
         for (i = 0; i < 16; i++) {
             newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * i);
             if (newEntry->name[0] == 0) {
+                i = 16;
                 break;
             }
         }
-        i = 16;
     }
     
-    if (j == 0 || i == 16) { // need a new block
+    if (j == 0 || i != 16) { // need a new block
         int newDataBlock = allocateDataBlocks();
         if (newDataBlock == 0 && parentInodeNum != 0) {
             error = -ENOSPC;
