@@ -227,11 +227,11 @@ static void removeInodeRecurse(const char *path) {
             if (strcmp(name, curEntry->name) == 0) {
                 if (i == 15) {
                     memset(curEntry, 0, sizeof(struct wfs_dentry));
-                } else if (i == 0) {
-                    int blockNum = (parentInode->blocks[j] - sb->d_blocks_ptr) / BLOCK_SIZE;
-                    ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
-                    *ptr ^= 1 << (blockNum % BITSPERINT);
-                    parentInode->size -= BLOCK_SIZE;
+                // } else if (i == 0) {
+                //     int blockNum = (parentInode->blocks[j] - sb->d_blocks_ptr) / BLOCK_SIZE;
+                //     ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
+                //     *ptr ^= 1 << (blockNum % BITSPERINT);
+                //     parentInode->size -= BLOCK_SIZE;
                 } else {  // copy last entry to current entry
                     memcpy(curEntry, mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * 15, sizeof(struct wfs_dentry));
                 }
