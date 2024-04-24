@@ -149,7 +149,7 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
     newInode->mtim = time(NULL);
     newInode->ctim = time(NULL);
     newInode->num = newInodeNum;
-    newInode->parent = parentInodeNum;
+    // newInode->parent = parentInodeNum;
 
     struct wfs_dentry *newEntry;
     int i;
@@ -187,7 +187,7 @@ static int wfs_mkdir(const char* path, mode_t mode) {
         return error;
     }
     struct wfs_dentry dot_entry = {.name = ".", .num = new->num};
-	struct wfs_dentry dotdot_entry = {.name = "..", .num = new->parent};
+	struct wfs_dentry dotdot_entry = {.name = "..", .num = 0}; // These can be removed
 	memcpy(mem + new->blocks[0], &dot_entry, sizeof(struct wfs_dentry));
 	memcpy(mem + new->blocks[0] + sizeof(struct wfs_dentry), &dotdot_entry, sizeof(struct wfs_dentry));
     new->size = 2 * sizeof(struct wfs_dentry);
@@ -206,8 +206,20 @@ static void removeInodeRecurse(int inodeNum, char *name) {
         ptr = (unsigned int*)(mem + sb->d_bitmap_ptr + (blockNum / 512) * BLOCK_SIZE + (blockNum / 32));
         *ptr ^= 1 << (blockNum % BITSPERINT);
     }
-    // remove entry from directory
-    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * inode->parent);
+    // If using rmdir, remove all contents of directory
+    if ((inode->mode & S_IFDIR) == S_IFDIR) {
+        int numEntries = inode->size / sizeof(struct wfs_dentry);
+        for (int i = 2; i < numEntries; i++) {
+            struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + inode->blocks[0] + sizeof(struct wfs_dentry) * i);
+            removeInodeRecurse(curEntry->num,curEntry->name);
+        }
+    }
+    // memset inode to 0
+    memset(inode, 0, sizeof(struct wfs_inode));
+}
+
+static void removeInodeFromDirectory(int parentInodeNum, char *name) {
+    struct wfs_inode *parentInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + 128 * parentInodeNum);
     int numEntries = parentInode->size / sizeof(struct wfs_dentry);
     for (int i = 2; i < numEntries; i++) {
         struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[0] + sizeof(struct wfs_dentry) * i);
@@ -221,16 +233,6 @@ static void removeInodeRecurse(int inodeNum, char *name) {
             break;
         }
     }
-    // If using rmdir, remove all contents of directory
-    if ((inode->mode & S_IFDIR) == S_IFDIR) {
-        int numEntries = inode->size / sizeof(struct wfs_dentry);
-        for (int i = 2; i < numEntries; i++) {
-            struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + inode->blocks[0] + sizeof(struct wfs_dentry) * i);
-            removeInodeRecurse(curEntry->num,curEntry->name);
-        }
-    }
-    // memset inode to 0
-    memset(inode, 0, sizeof(struct wfs_inode));
 }
 
 static int wfs_unlink(const char* path) {
@@ -238,6 +240,7 @@ static int wfs_unlink(const char* path) {
     int inodeNum = getInodeFromPath(path);
     char *name = strrchr(path, '/') + 1;
     removeInodeRecurse(inodeNum, name);
+    removeInodeFromDirectory(parentInodeFromPath(path, name), name);
     return 0;
 }
 
@@ -246,6 +249,7 @@ static int wfs_rmdir(const char* path) {
     int inodeNum = getInodeFromPath(path);
     char *name = strrchr(path, '/') + 1;
     removeInodeRecurse(inodeNum, name);
+    removeInodeFromDirectory(parentInodeFromPath(path, name), name);
     return 0;
 }
 
