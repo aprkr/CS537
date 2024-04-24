@@ -291,16 +291,33 @@ static int wfs_read(const char* path, char *buf, size_t size, off_t offset, stru
 static int wfs_write(const char* path, const char *buf, size_t size, off_t offset, struct fuse_file_info* fi) {
     printf("write\n");
     int inodeNum = getInodeFromPath(path);
-    int neededNumBlocks = (offset + size) / BLOCK_SIZE + 1;
-    if (neededNumBlocks > N_BLOCKS) {
+    int neededNumBlocks = (offset + size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    if (neededNumBlocks > 7 + (BLOCK_SIZE / sizeof(off_t))) {
         return -ENOSPC;
     }
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
-    int curNumBlocks = inode->size / BLOCK_SIZE + 1;
+    int curNumBlocks = (inode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     if (curNumBlocks < neededNumBlocks) {
         for (int i = curNumBlocks; i < neededNumBlocks; i++) {
             int newDataBlock = allocateDataBlocks();
-            inode->blocks[i] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+            if (newDataBlock == 0) {
+                return -ENOSPC;
+            }
+            if (i > IND_BLOCK) {
+                off_t indirectBlock = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+                memcpy(mem + inode->blocks[IND_BLOCK] + (i - IND_BLOCK) * sizeof(off_t), &indirectBlock, sizeof(off_t));
+
+            } else if (i == IND_BLOCK) {
+                int newIndirectDataBlock = allocateDataBlocks();
+                if (newIndirectDataBlock == 0) {
+                    return -ENOSPC;
+                }
+                inode->blocks[IND_BLOCK] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+                off_t indirectBlock = sb->d_blocks_ptr + newIndirectDataBlock * BLOCK_SIZE;
+                memcpy(mem + inode->blocks[IND_BLOCK], &indirectBlock, sizeof(off_t));
+            } else {
+                inode->blocks[i] = sb->d_blocks_ptr + newDataBlock * BLOCK_SIZE;
+            }
         }
     }
     int bytesRemaining = size;
@@ -309,16 +326,26 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
     printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
     unsigned char *ptr;
     
-    if (size > BLOCK_SIZE) {
-        int start = offset % BLOCK_SIZE;
-        ptr = mem + inode->blocks[curBlock] + start;
-        memcpy(ptr, buf, BLOCK_SIZE - start);
-        bytesRemaining -= (BLOCK_SIZE - start);
-        curBlock++;
-    }
+    // if (size > BLOCK_SIZE && offset % BLOCK_SIZE) {
+    //     int start = offset % BLOCK_SIZE;
+    //     if (curBlock >= IND_BLOCK) {
+    //         memcpy(&ptr, mem + inode->blocks[IND_BLOCK] + (curBlock - IND_BLOCK) * sizeof(off_t), sizeof(off_t));
+    //     } else {
+    //         ptr = mem + inode->blocks[curBlock] + start;
+    //     }
+    //     memcpy(ptr, buf, BLOCK_SIZE - start);
+    //     bytesRemaining -= (BLOCK_SIZE - start);
+    //     curBlock++;
+    // }
     
     while (bytesRemaining > 0) {
-        ptr = mem + inode->blocks[curBlock];
+        if (curBlock >= IND_BLOCK) {
+            off_t temp;
+            memcpy(&temp, mem + inode->blocks[IND_BLOCK] + (curBlock - IND_BLOCK) * sizeof(off_t), sizeof(off_t));
+            ptr = mem + temp;
+        } else {
+            ptr = mem + inode->blocks[curBlock];
+        }
         if (bytesRemaining < BLOCK_SIZE) {
             memcpy(ptr, buf + (size - bytesRemaining), bytesRemaining);
             break;
