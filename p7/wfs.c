@@ -64,7 +64,7 @@ static int allocateInode() {
     unsigned int *maxptr = (unsigned int*)(mem + sb->d_bitmap_ptr);
     int num_ints = 0;
     while (ptr < maxptr) {
-        if (*ptr == UINTMAX_MAX) {
+        if (*ptr == 0xFFFFFFFF) {
             ptr++;
             num_ints++;
             continue;
@@ -83,7 +83,7 @@ static int allocateDataBlocks() {
     unsigned int *maxptr = (unsigned int*)(mem + sb->i_blocks_ptr);
     int num_ints = 0;
     while (ptr < maxptr) {
-        if (*ptr == UINTMAX_MAX) {
+        if (*ptr == 0xFFFFFFFF) {
             ptr++;
             num_ints++;
             continue;
