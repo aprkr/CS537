@@ -347,7 +347,7 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
         } else {
             ptr = mem + inode->blocks[curBlock];
         }
-        memcpy(ptr, buf, BLOCK_SIZE - start);
+        memcpy(ptr + start, buf, BLOCK_SIZE - start);
         bytesRemaining -= (BLOCK_SIZE - start);
         curBlock++;
     }
