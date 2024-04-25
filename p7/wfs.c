@@ -266,16 +266,22 @@ static int wfs_read(const char* path, char *buf, size_t size, off_t offset, stru
     int curBlock = offset / BLOCK_SIZE;
     
     unsigned char *ptr;
-    int start = offset % BLOCK_SIZE;
-    if (start) {
-        ptr = mem + inode->blocks[curBlock] + start;
-        memcpy(buf, ptr, BLOCK_SIZE - start);
-        bytesRemaining -= BLOCK_SIZE - start;
-        curBlock++;
-    }
+    // int start = offset % BLOCK_SIZE;
+    // if (start) {
+    //     ptr = mem + inode->blocks[curBlock] + start;
+    //     memcpy(buf, ptr, BLOCK_SIZE - start);
+    //     bytesRemaining -= BLOCK_SIZE - start;
+    //     curBlock++;
+    // }
     
     while (bytesRemaining > 0) {
-        ptr = mem + inode->blocks[curBlock];
+        if (curBlock >= IND_BLOCK) {
+            off_t temp;
+            memcpy(&temp, mem + inode->blocks[IND_BLOCK] + (curBlock - IND_BLOCK) * sizeof(off_t), sizeof(off_t));
+            ptr = mem + temp;
+        } else {
+            ptr = mem + inode->blocks[curBlock];
+        }
         if (bytesRemaining < BLOCK_SIZE) {
             memcpy(buf + (size - bytesRemaining), ptr , bytesRemaining);
             break;
