@@ -338,7 +338,7 @@ static int wfs_write(const char* path, const char *buf, size_t size, off_t offse
     printf("%lu %lu %d %d\n",size,offset,bytesRemaining,curBlock);
     unsigned char *ptr;
     
-    if (size > BLOCK_SIZE && offset % BLOCK_SIZE) {
+    if (offset % BLOCK_SIZE) {
         int start = offset % BLOCK_SIZE;
         if (curBlock >= IND_BLOCK) {
             off_t temp;
