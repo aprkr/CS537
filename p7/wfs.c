@@ -31,13 +31,15 @@ static int getInodeFromPath(const char *p) {
         int curInodeNum = 0;
         for (int i = 0; i < numslashes; i++) {
             struct wfs_inode *curInode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * curInodeNum);
-            int numEntries = (curInode->size / sizeof(struct wfs_dentry));
-            for (int j = 0; j < numEntries; j++) {
-                struct wfs_dentry *curEntry = (struct wfs_dentry*)(mem + curInode->blocks[0] + j * sizeof(struct wfs_dentry));
-                if (strcmp(curEntry->name, names[i]) == 0) {
-                    curInodeNum = curEntry->num;
-                    break;
-                }
+            int numBlocks = (curInode->size / BLOCK_SIZE);
+            for (int j = 0; j < numBlocks; j++) {
+                for (int k = 0; k < 16; k++) {
+                    struct wfs_dentry *curEntry = (struct wfs_dentry*)(mem + curInode->blocks[j] + k * sizeof(struct wfs_dentry));
+                    if (strcmp(curEntry->name, names[i]) == 0) {
+                        curInodeNum = curEntry->num;
+                        break;
+                    }
+                } 
             }
             if (curInode->num == curInodeNum) {
                 return -ENOENT;
@@ -155,13 +157,13 @@ static struct wfs_inode *createFile(const char *path, mode_t mode) {
         for (i = 0; i < 16; i++) {
             newEntry = (struct wfs_dentry *)(mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * i);
             if (newEntry->name[0] == 0) {
-                i = 16;
+                i = 17;
                 break;
             }
         }
     }
     
-    if (j == 0 || i != 16) { // need a new block
+    if (j == 0 || i != 17) { // need a new block
         int newDataBlock = allocateDataBlocks();
         if (newDataBlock == 0 && parentInodeNum != 0) {
             error = -ENOSPC;
@@ -207,13 +209,13 @@ static void removeInodeRecurse(const char *path) {
     char *name = strrchr(path, '/') + 1;
     // clear bitmaps
     unsigned char *ptr = (unsigned char*)(mem + sb->i_bitmap_ptr + (inodeNum / 8));
-    *ptr ^= 1 << (inodeNum % BITSPERINT);
+    *ptr ^= 1 << (inodeNum % 8);
     struct wfs_inode *inode = (struct wfs_inode *)(mem + sb->i_blocks_ptr + BLOCK_SIZE * inodeNum);
     int numBlocks = (inode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     for (int i = 0; i < numBlocks; i++) {
         int blockNum = (inode->blocks[i] - sb->d_blocks_ptr) / BLOCK_SIZE;
         ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
-        *ptr ^= 1 << (blockNum % BITSPERINT);
+        *ptr ^= 1 << (blockNum % 8);
     }
     // memset inode to 0
     memset(inode, 0, sizeof(struct wfs_inode));
@@ -225,16 +227,7 @@ static void removeInodeRecurse(const char *path) {
         for (int i = 0; i < 16; i++) {
             struct wfs_dentry *curEntry = (struct wfs_dentry *)(mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * i);
             if (strcmp(name, curEntry->name) == 0) {
-                if (i == 15) {
-                    memset(curEntry, 0, sizeof(struct wfs_dentry));
-                // } else if (i == 0) {
-                //     int blockNum = (parentInode->blocks[j] - sb->d_blocks_ptr) / BLOCK_SIZE;
-                //     ptr = (unsigned char*)(mem + sb->d_bitmap_ptr + (blockNum / 8));
-                //     *ptr ^= 1 << (blockNum % BITSPERINT);
-                //     parentInode->size -= BLOCK_SIZE;
-                } else {  // copy last entry to current entry
-                    memcpy(curEntry, mem + parentInode->blocks[j] + sizeof(struct wfs_dentry) * 15, sizeof(struct wfs_dentry));
-                }
+                memset(curEntry, 0, sizeof(struct wfs_dentry));
                 break;
             }
         }
